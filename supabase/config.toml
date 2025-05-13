@@ -1,0 +1,11 @@
+
+project_id = "ltttwatjtvnnkxmhxnoc"
+
+[functions.generate-model-answer]
+verify_jwt = true
+
+[functions.summarize-news]
+verify_jwt = true
+
+[functions.essay-feedback]
+verify_jwt = true
