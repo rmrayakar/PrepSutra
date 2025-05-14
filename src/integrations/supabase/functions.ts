@@ -1,4 +1,5 @@
 import { supabase } from "./client";
+import { TablesInsert } from "./types";
 
 export interface ModelAnswerResponse {
   modelAnswer: string;
@@ -87,6 +88,339 @@ export const getEssayFeedback = async (
   const { data, error } = await supabase.functions.invoke("essay-feedback", {
     body: { title, content },
   });
+
+  if (error) throw error;
+  return data;
+};
+
+// Exam Question Function Types
+export interface QuestionSearchParams {
+  yearStart?: number;
+  yearEnd?: number;
+  exactYear?: number;
+  subject?: string;
+  examType?: string;
+  keywords?: string[];
+  question_type?: string;
+  sortBy?: "year" | "subject" | "exam_type" | "question_type";
+  sortOrder?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+  userQuestionsOnly?: boolean; // Flag to get only user's questions
+}
+
+export interface QuestionSearchResult {
+  questions: any[];
+  count: number;
+}
+
+export interface AnswerSimilarityResponse {
+  similarity_score: number;
+  awarded_marks: number;
+}
+
+// Add a new exam question
+export const addExamQuestion = async (
+  questionData: TablesInsert<"exam_questions">
+) => {
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("User must be authenticated to add questions");
+  }
+
+  // Set user_id and default is_database_question=false for user-created questions
+  const questionWithUser = {
+    ...questionData,
+    user_id: user.id,
+    is_database_question: questionData.is_database_question || false,
+  };
+
+  const { data, error } = await supabase
+    .from("exam_questions")
+    .insert(questionWithUser)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Get a specific question by ID
+export const getExamQuestionById = async (id: string) => {
+  const { data, error } = await supabase
+    .from("exam_questions")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Delete user-created question
+export const deleteExamQuestion = async (id: string) => {
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("User must be authenticated to delete questions");
+  }
+
+  // Only allow deletion of the user's own questions
+  const { error } = await supabase
+    .from("exam_questions")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .eq("is_database_question", false);
+
+  if (error) throw error;
+  return true;
+};
+
+// Search and filter questions
+export const searchExamQuestions = async (
+  params: QuestionSearchParams
+): Promise<QuestionSearchResult> => {
+  let query = supabase.from("exam_questions").select("*", { count: "exact" });
+
+  // Get current user for filtering
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Filter by user questions only if requested
+  if (params.userQuestionsOnly && user) {
+    query = query.eq("user_id", user.id);
+  } else if (user) {
+    // Otherwise, show database questions and user's own questions
+    query = query.or(`is_database_question.eq.true,user_id.eq.${user.id}`);
+  } else {
+    // If not logged in, show only database questions
+    query = query.eq("is_database_question", true);
+  }
+
+  // Apply other filters
+  if (params.exactYear) {
+    query = query.eq("year", params.exactYear);
+  } else {
+    if (params.yearStart) {
+      query = query.gte("year", params.yearStart);
+    }
+    if (params.yearEnd) {
+      query = query.lte("year", params.yearEnd);
+    }
+  }
+
+  if (params.subject) {
+    query = query.eq("subject", params.subject);
+  }
+
+  if (params.examType) {
+    query = query.eq("exam_type", params.examType);
+  }
+
+  if (params.question_type) {
+    query = query.eq("question_type", params.question_type);
+  }
+
+  if (params.keywords && params.keywords.length > 0) {
+    // Use Postgres array operators to search for keywords
+    query = query.overlaps("keywords", params.keywords);
+  }
+
+  // Apply sorting
+  if (params.sortBy) {
+    const order = params.sortOrder || "asc";
+    query = query.order(params.sortBy, { ascending: order === "asc" });
+  } else {
+    // Default sorting by year (newest first)
+    query = query.order("year", { ascending: false });
+  }
+
+  // Apply pagination
+  if (params.limit) {
+    query = query.limit(params.limit);
+  }
+
+  if (params.offset) {
+    query = query.range(
+      params.offset,
+      params.offset + (params.limit || 10) - 1
+    );
+  }
+
+  const { data, error, count } = await query;
+
+  if (error) throw error;
+  return {
+    questions: data || [],
+    count: count || 0,
+  };
+};
+
+// Submit an answer to a question
+export const submitAnswer = async (questionId: string, answerText: string) => {
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("User must be authenticated to submit answers");
+  }
+
+  // Get the question to compare with the correct answer
+  const { data: question, error: questionError } = await supabase
+    .from("exam_questions")
+    .select("*")
+    .eq("id", questionId)
+    .single();
+
+  if (questionError) throw questionError;
+
+  // Calculate similarity and awarded marks
+  const { similarity_score, awarded_marks } = await calculateAnswerScore(
+    answerText,
+    question.correct_answer || "",
+    question.marks
+  );
+
+  // Insert or update the answer
+  const { data, error } = await supabase
+    .from("question_answers")
+    .upsert({
+      question_id: questionId,
+      user_id: user.id,
+      answer_text: answerText,
+      similarity_score,
+      awarded_marks,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+// Get user's answer to a specific question
+export const getUserAnswer = async (questionId: string) => {
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from("question_answers")
+    .select("*")
+    .eq("question_id", questionId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (error && error.code !== "PGRST116") {
+    // PGRST116 is the "no rows returned" error, which we can ignore
+    throw error;
+  }
+
+  return data || null;
+};
+
+// Calculate similarity score and awarded marks
+export const calculateAnswerScore = async (
+  userAnswer: string,
+  correctAnswer: string,
+  maxMarks: number
+): Promise<AnswerSimilarityResponse> => {
+  try {
+    // For descriptive answers, use the OpenAI function to calculate semantic similarity
+    if (userAnswer.length > 30 && correctAnswer.length > 30) {
+      const { data, error } = await supabase.functions.invoke(
+        "calculate-answer-similarity",
+        {
+          body: { userAnswer, correctAnswer, maxMarks },
+        }
+      );
+
+      if (error) throw error;
+      return data;
+    } else {
+      // For simple answers, use a simpler matching algorithm
+      // Convert to lowercase and remove punctuation
+      const processedUserAnswer = userAnswer
+        .toLowerCase()
+        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
+      const processedCorrectAnswer = correctAnswer
+        .toLowerCase()
+        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "");
+
+      // Calculate basic similarity (exact match = 100%, no match = 0%)
+      const similarity =
+        processedUserAnswer === processedCorrectAnswer ? 1.0 : 0.0;
+
+      // Award marks based on similarity
+      const awardedMarks = similarity * maxMarks;
+
+      return {
+        similarity_score: similarity,
+        awarded_marks: awardedMarks,
+      };
+    }
+  } catch (error) {
+    console.error("Error calculating similarity:", error);
+
+    // Return a default score on error
+    return {
+      similarity_score: 0,
+      awarded_marks: 0,
+    };
+  }
+};
+
+// Get all possible subjects (for dropdown filters)
+export const getExamSubjects = async () => {
+  const { data, error } = await supabase
+    .from("exam_questions")
+    .select("subject")
+    .order("subject");
+
+  if (error) throw error;
+
+  // Get unique subjects
+  const subjects = [...new Set(data.map((item) => item.subject))];
+  return subjects;
+};
+
+// Update an exam question
+export const updateExamQuestion = async (
+  id: string,
+  updates: Partial<TablesInsert<"exam_questions">>
+) => {
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("User must be authenticated to update questions");
+  }
+
+  const { data, error } = await supabase
+    .from("exam_questions")
+    .update(updates)
+    .eq("id", id)
+    .eq("user_id", user.id) // Ensure user can only update their own questions
+    .select()
+    .single();
 
   if (error) throw error;
   return data;

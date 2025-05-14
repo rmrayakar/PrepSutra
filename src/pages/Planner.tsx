@@ -632,6 +632,8 @@ const Planner = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                <div className="w-full overflow-x-auto">
+                <div className="min-w-[320px]">
                   <Calendar
                     mode="single"
                     selected={date}
@@ -646,6 +648,8 @@ const Planner = () => {
                       ),
                     }}
                   />
+                  </div>
+                  </div>
                   {selectedDateTasks.length > 0 && (
                     <div className="mt-4 space-y-2">
                       <h3 className="font-medium">

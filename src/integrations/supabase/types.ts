@@ -292,6 +292,113 @@ export interface Database {
           }
         ];
       };
+      exam_questions: {
+        Row: {
+          id: string;
+          question_text: string;
+          year: number;
+          subject: string;
+          exam_type: string;
+          keywords: string[];
+          options?: string[] | null;
+          correct_answer?: string | null;
+          explanation?: string | null;
+          question_type?: string | null;
+          marks: number;
+          user_id?: string | null;
+          is_database_question: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          question_text: string;
+          year: number;
+          subject: string;
+          exam_type: string;
+          keywords: string[];
+          options?: string[] | null;
+          correct_answer?: string | null;
+          explanation?: string | null;
+          question_type?: string | null;
+          marks?: number;
+          user_id?: string | null;
+          is_database_question?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          question_text?: string;
+          year?: number;
+          subject?: string;
+          exam_type?: string;
+          keywords?: string[];
+          options?: string[] | null;
+          correct_answer?: string | null;
+          explanation?: string | null;
+          question_type?: string | null;
+          marks?: number;
+          user_id?: string | null;
+          is_database_question?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "exam_questions_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      question_answers: {
+        Row: {
+          id: string;
+          question_id: string;
+          user_id: string;
+          answer_text: string;
+          similarity_score?: number | null;
+          awarded_marks?: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          question_id: string;
+          user_id: string;
+          answer_text: string;
+          similarity_score?: number | null;
+          awarded_marks?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          question_id?: string;
+          user_id?: string;
+          answer_text?: string;
+          similarity_score?: number | null;
+          awarded_marks?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "question_answers_question_id_fkey";
+            columns: ["question_id"];
+            referencedRelation: "exam_questions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "question_answers_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
