@@ -4,10 +4,10 @@ create table if not exists public.study_plans (
   user_id uuid references auth.users on delete cascade not null,
   title text not null,
   description text,
-  start_date timestamp with time zone not null,
+  start_date timestamp with time zone not null default timezone('Asia/Kolkata'::text, now()),
   end_date timestamp with time zone,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+  created_at timestamp with time zone default timezone('Asia/Kolkata'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('Asia/Kolkata'::text, now()) not null
 );
 
 -- Create study_tasks table
@@ -19,9 +19,27 @@ create table if not exists public.study_tasks (
   due_date timestamp with time zone,
   priority text check (priority in ('low', 'medium', 'high')),
   status text default 'pending' check (status in ('pending', 'in_progress', 'completed')),
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+  created_at timestamp with time zone default timezone('Asia/Kolkata'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('Asia/Kolkata'::text, now()) not null
 );
+
+-- Create function to update timestamps
+create or replace function public.update_timestamp()
+returns trigger as $$
+begin
+  new.updated_at = timezone('Asia/Kolkata'::text, now());
+  return new;
+end;
+$$ language plpgsql;
+
+-- Create triggers for updating timestamps
+create trigger update_study_plans_timestamp
+  before update on study_plans
+  for each row execute procedure public.update_timestamp();
+
+create trigger update_study_tasks_timestamp
+  before update on study_tasks
+  for each row execute procedure public.update_timestamp();
 
 -- Enable Row Level Security
 alter table public.study_plans enable row level security;

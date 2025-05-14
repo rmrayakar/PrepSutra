@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import Header from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -274,6 +275,8 @@ export default function Profile() {
   }
 
   return (
+    <div className="min-h-screen flex flex-col">
+      <Header />
     <div className="container mx-auto py-8">
       <Card>
         <CardHeader>
@@ -487,6 +490,6 @@ export default function Profile() {
         </CardContent>
       </Card>
     </div>
+    </div>
   );
 }
- 

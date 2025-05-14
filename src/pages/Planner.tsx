@@ -150,17 +150,35 @@ const Planner = () => {
     }
   };
 
+  const convertToIST = (date: Date): Date => {
+    return new Date(date.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  };
+
+  const formatISTDate = (date: Date): string => {
+    return date.toLocaleString("en-US", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
   const formatDueDate = (dateString: string | null) => {
     if (!dateString) return null;
-    const date = new Date(dateString);
+    const date = convertToIST(new Date(dateString));
     return {
       date: date.toLocaleDateString("en-US", {
+        timeZone: "Asia/Kolkata",
         weekday: "short",
         month: "short",
         day: "numeric",
         year: "numeric",
       }),
       time: date.toLocaleTimeString("en-US", {
+        timeZone: "Asia/Kolkata",
         hour: "2-digit",
         minute: "2-digit",
       }),
@@ -308,8 +326,8 @@ const Planner = () => {
         return;
       }
 
-      const examDate = new Date(generatorForm.examDate);
-      const today = new Date();
+      const examDate = convertToIST(new Date(generatorForm.examDate));
+      const today = convertToIST(new Date());
       const daysUntilExam = Math.ceil(
         (examDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
       );
@@ -340,11 +358,40 @@ const Planner = () => {
 
       if (planError) throw planError;
 
-      // Generate tasks based on focus areas
-      const tasks = [];
-      const hoursPerDay = parseInt(generatorForm.dailyHours.split("-")[0]);
-      const daysPerSubject = Math.floor(daysUntilExam / selectedAreas.length);
+      // Calculate available study hours per day
+      const [minHours, maxHours] = generatorForm.dailyHours
+        .split("-")
+        .map(Number);
+      const avgHoursPerDay = (minHours + maxHours) / 2;
 
+      // Define task types and their weights
+      const taskTypes = {
+        initialReading: { weight: 0.4, duration: 2 }, // 40% of time, 2 hours per session
+        practice: { weight: 0.3, duration: 1.5 }, // 30% of time, 1.5 hours per session
+        revision: { weight: 0.3, duration: 1 }, // 30% of time, 1 hour per session
+      };
+
+      // Calculate total available study hours
+      const totalStudyHours = daysUntilExam * avgHoursPerDay;
+
+      // Generate tasks based on focus areas with better distribution
+      const tasks = [];
+      const subjectWeights = {
+        gs1: 1.2, // Slightly more weight for GS1
+        gs2: 1.2, // Slightly more weight for GS2
+        gs3: 1.2, // Slightly more weight for GS3
+        gs4: 1.2, // Slightly more weight for GS4
+        essay: 1.0, // Normal weight for Essay
+        optional: 1.5, // Higher weight for Optional subject
+      };
+
+      // Calculate total weight
+      const totalWeight = selectedAreas.reduce(
+        (sum, area) => sum + (subjectWeights[area] || 1),
+        0
+      );
+
+      // Distribute tasks for each subject
       for (const area of selectedAreas) {
         const subjectName = {
           gs1: "General Studies Paper I",
@@ -355,42 +402,77 @@ const Planner = () => {
           optional: generatorForm.optionalSubject || "Optional Subject",
         }[area];
 
-        // Create main subject task
-        tasks.push({
-          plan_id: plan.id,
-          title: `${subjectName} - Initial Reading`,
-          description: `Complete initial reading of ${subjectName} syllabus`,
-          due_date: new Date(
-            today.getTime() + daysPerSubject * 24 * 60 * 60 * 1000
-          ).toISOString(),
-          priority: "high",
-          status: "pending",
-        });
+        const subjectWeight = subjectWeights[area] || 1;
+        const subjectHours = (totalStudyHours * subjectWeight) / totalWeight;
 
-        // Create practice task
-        tasks.push({
-          plan_id: plan.id,
-          title: `${subjectName} - Practice Questions`,
-          description: `Solve practice questions and previous year papers for ${subjectName}`,
-          due_date: new Date(
-            today.getTime() + daysPerSubject * 0.8 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-          priority: "medium",
-          status: "pending",
-        });
+        // Calculate number of tasks for each type
+        const initialReadingTasks = Math.ceil(
+          (subjectHours * taskTypes.initialReading.weight) /
+            taskTypes.initialReading.duration
+        );
+        const practiceTasks = Math.ceil(
+          (subjectHours * taskTypes.practice.weight) /
+            taskTypes.practice.duration
+        );
+        const revisionTasks = Math.ceil(
+          (subjectHours * taskTypes.revision.weight) /
+            taskTypes.revision.duration
+        );
 
-        // Create revision task
-        tasks.push({
-          plan_id: plan.id,
-          title: `${subjectName} - Revision`,
-          description: `Complete revision of ${subjectName} notes and important topics`,
-          due_date: new Date(
-            today.getTime() + daysPerSubject * 0.9 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-          priority: "high",
-          status: "pending",
-        });
+        // Distribute tasks evenly across the timeline
+        const distributeTasks = (count, type, duration) => {
+          const interval = daysUntilExam / (count + 1);
+          for (let i = 1; i <= count; i++) {
+            const dueDate = convertToIST(
+              new Date(today.getTime() + interval * i * 24 * 60 * 60 * 1000)
+            );
+
+            let title, description;
+            switch (type) {
+              case "initialReading":
+                title = `${subjectName} - Initial Reading ${i}/${count}`;
+                description = `Complete initial reading of ${subjectName} syllabus - Part ${i}`;
+                break;
+              case "practice":
+                title = `${subjectName} - Practice Questions ${i}/${count}`;
+                description = `Solve practice questions and previous year papers for ${subjectName} - Set ${i}`;
+                break;
+              case "revision":
+                title = `${subjectName} - Revision ${i}/${count}`;
+                description = `Complete revision of ${subjectName} notes and important topics - Part ${i}`;
+                break;
+            }
+
+            tasks.push({
+              plan_id: plan.id,
+              title,
+              description,
+              due_date: dueDate.toISOString(),
+              priority:
+                type === "revision"
+                  ? "high"
+                  : type === "initialReading"
+                  ? "medium"
+                  : "low",
+              status: "pending",
+            });
+          }
+        };
+
+        distributeTasks(
+          initialReadingTasks,
+          "initialReading",
+          taskTypes.initialReading.duration
+        );
+        distributeTasks(practiceTasks, "practice", taskTypes.practice.duration);
+        distributeTasks(revisionTasks, "revision", taskTypes.revision.duration);
       }
+
+      // Sort tasks by due date
+      tasks.sort(
+        (a, b) =>
+          new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+      );
 
       // Insert all tasks
       const { error: tasksError } = await supabase
@@ -458,19 +540,21 @@ const Planner = () => {
 
   // Add this new function to get tasks for a specific date
   const getTasksForDate = (date: Date) => {
+    const istDate = convertToIST(date);
     return tasks.filter((task) => {
-      const taskDate = new Date(task.due_date);
+      const taskDate = convertToIST(new Date(task.due_date));
       return (
-        taskDate.getDate() === date.getDate() &&
-        taskDate.getMonth() === date.getMonth() &&
-        taskDate.getFullYear() === date.getFullYear()
+        taskDate.getDate() === istDate.getDate() &&
+        taskDate.getMonth() === istDate.getMonth() &&
+        taskDate.getFullYear() === istDate.getFullYear()
       );
     });
   };
 
   // Add this new function to get task indicators for the calendar
   const getTaskIndicators = (date: Date) => {
-    const dateTasks = getTasksForDate(date);
+    const istDate = convertToIST(date);
+    const dateTasks = getTasksForDate(istDate);
     if (dateTasks.length === 0) return null;
 
     const highPriority = dateTasks.filter(
@@ -509,10 +593,12 @@ const Planner = () => {
 
   // Update the date selection handler
   const handleDateSelect = (newDate: Date | undefined) => {
-    setDate(newDate);
     if (newDate) {
-      setSelectedDateTasks(getTasksForDate(newDate));
+      const istDate = convertToIST(newDate);
+      setDate(istDate);
+      setSelectedDateTasks(getTasksForDate(istDate));
     } else {
+      setDate(undefined);
       setSelectedDateTasks([]);
     }
   };
@@ -706,21 +792,21 @@ const Planner = () => {
                               key={task.id}
                               className="rounded-md border p-4"
                             >
-                          <div className="flex items-start justify-between">
-                            <div>
+                              <div className="flex items-start justify-between">
+                                <div>
                                   <h3 className="font-medium">{task.title}</h3>
-                              <p className="text-sm text-muted-foreground">
+                                  <p className="text-sm text-muted-foreground">
                                     {task.description}
-                              </p>
-                              <div className="mt-2 flex items-center gap-2">
+                                  </p>
+                                  <div className="mt-2 flex items-center gap-2">
                                     {dueDate && (
                                       <div className="flex flex-col gap-1">
                                         <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
                                           {dueDate.date}
                                         </span>
-                                <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
+                                        <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
                                           {dueDate.time}
-                                </span>
+                                        </span>
                                       </div>
                                     )}
                                     <span
@@ -735,9 +821,9 @@ const Planner = () => {
                                       {task.priority.charAt(0).toUpperCase() +
                                         task.priority.slice(1)}{" "}
                                       Priority
-                                </span>
-                              </div>
-                            </div>
+                                    </span>
+                                  </div>
+                                </div>
                                 <div className="flex items-center gap-2">
                                   <Select
                                     value={task.status}
@@ -773,9 +859,9 @@ const Planner = () => {
                                   >
                                     <Trash2 className="h-4 w-4 text-red-500" />
                                   </Button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
                           );
                         })}
                       </TabsContent>
@@ -789,23 +875,23 @@ const Planner = () => {
                                 key={task.id}
                                 className="rounded-md border p-4"
                               >
-                          <div className="flex items-start justify-between">
-                            <div>
+                                <div className="flex items-start justify-between">
+                                  <div>
                                     <h3 className="font-medium">
                                       {task.title}
                                     </h3>
-                              <p className="text-sm text-muted-foreground">
+                                    <p className="text-sm text-muted-foreground">
                                       {task.description}
-                              </p>
-                              <div className="mt-2 flex items-center gap-2">
+                                    </p>
+                                    <div className="mt-2 flex items-center gap-2">
                                       {dueDate && (
                                         <div className="flex flex-col gap-1">
                                           <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
                                             {dueDate.date}
                                           </span>
-                                <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
+                                          <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
                                             {dueDate.time}
-                                </span>
+                                          </span>
                                         </div>
                                       )}
                                       <span
@@ -820,9 +906,9 @@ const Planner = () => {
                                         {task.priority.charAt(0).toUpperCase() +
                                           task.priority.slice(1)}{" "}
                                         Priority
-                                </span>
-                              </div>
-                            </div>
+                                      </span>
+                                    </div>
+                                  </div>
                                   <div className="flex items-center gap-2">
                                     <Select
                                       value={task.status}
@@ -860,9 +946,9 @@ const Planner = () => {
                                     >
                                       <Trash2 className="h-4 w-4 text-red-500" />
                                     </Button>
-                            </div>
-                          </div>
-                        </div>
+                                  </div>
+                                </div>
+                              </div>
                             );
                           })}
                       </TabsContent>
@@ -876,23 +962,23 @@ const Planner = () => {
                                 key={task.id}
                                 className="rounded-md border p-4"
                               >
-                          <div className="flex items-start justify-between">
-                            <div>
+                                <div className="flex items-start justify-between">
+                                  <div>
                                     <h3 className="font-medium">
                                       {task.title}
                                     </h3>
-                              <p className="text-sm text-muted-foreground">
+                                    <p className="text-sm text-muted-foreground">
                                       {task.description}
-                              </p>
-                              <div className="mt-2 flex items-center gap-2">
+                                    </p>
+                                    <div className="mt-2 flex items-center gap-2">
                                       {dueDate && (
                                         <div className="flex flex-col gap-1">
                                           <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
                                             {dueDate.date}
                                           </span>
-                                <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
+                                          <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
                                             {dueDate.time}
-                                </span>
+                                          </span>
                                         </div>
                                       )}
                                       <span
@@ -907,9 +993,9 @@ const Planner = () => {
                                         {task.priority.charAt(0).toUpperCase() +
                                           task.priority.slice(1)}{" "}
                                         Priority
-                                </span>
-                              </div>
-                            </div>
+                                      </span>
+                                    </div>
+                                  </div>
                                   <div className="flex items-center gap-2">
                                     <Select
                                       value={task.status}
@@ -947,16 +1033,16 @@ const Planner = () => {
                                     >
                                       <Trash2 className="h-4 w-4 text-red-500" />
                                     </Button>
-                            </div>
-                          </div>
-                        </div>
+                                  </div>
+                                </div>
+                              </div>
                             );
                           })}
                       </TabsContent>
                     </Tabs>
                   </CardContent>
                 </Card>
-                
+
                 <Card>
                   <CardHeader>
                     <CardTitle>Study Plans</CardTitle>
@@ -1099,7 +1185,7 @@ const Planner = () => {
                                 </Select>
                               </div>
 
-                        <div>
+                              <div>
                                 <Label>Focus Areas</Label>
                                 <div className="grid grid-cols-2 gap-2 mt-2">
                                   <div className="flex items-center space-x-2">
@@ -1201,10 +1287,10 @@ const Planner = () => {
                                     <Label htmlFor="optional">Optional</Label>
                                   </div>
                                 </div>
-                        </div>
+                              </div>
 
                               {generatorForm.focusAreas.optional && (
-                        <div>
+                                <div>
                                   <Label>Optional Subject</Label>
                                   <Input
                                     placeholder="Enter your optional subject"
@@ -1218,7 +1304,7 @@ const Planner = () => {
                                   />
                                 </div>
                               )}
-                        </div>
+                            </div>
                             <DialogFooter>
                               <Button onClick={handleGeneratePlan}>
                                 Generate Plan
@@ -1232,7 +1318,7 @@ const Planner = () => {
                         {studyPlans.map((plan) => (
                           <div key={plan.id} className="rounded-md border p-4">
                             <div className="flex items-start justify-between">
-                      <div>
+                              <div>
                                 <h3 className="font-medium">{plan.title}</h3>
                                 <p className="text-sm text-muted-foreground">
                                   {plan.description}
@@ -1275,7 +1361,7 @@ const Planner = () => {
                                 </Button>
                               </div>
                             </div>
-                        </div>
+                          </div>
                         ))}
                       </div>
                     </div>
