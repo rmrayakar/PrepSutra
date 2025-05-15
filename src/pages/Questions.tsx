@@ -158,12 +158,18 @@ const Questions = () => {
   const [modelAnswer, setModelAnswer] = useState<string | null>(null);
   const [answerLoading, setAnswerLoading] = useState<boolean>(false);
 
+  // Add new state to track saved questions
+  const [savedQuestionIds, setSavedQuestionIds] = useState<Set<string>>(
+    new Set()
+  );
+
   const { toast } = useToast();
 
-  // Fetch questions on initial load and when filters change
+  // Modify useEffect to also fetch saved questions
   useEffect(() => {
     fetchQuestions();
     fetchSubjects();
+    fetchSavedQuestions();
   }, [
     examType,
     yearRange,
@@ -249,6 +255,26 @@ const Questions = () => {
       setAnswers(answersMap);
     } catch (error) {
       console.error("Error loading answers:", error);
+    }
+  };
+
+  // Add function to fetch saved questions
+  const fetchSavedQuestions = async () => {
+    try {
+      const result = await searchExamQuestions({
+        userQuestionsOnly: true,
+      });
+
+      // Create a Set of original question IDs that the user has saved
+      const savedIds = new Set(
+        result.questions
+          .filter((q) => !q.is_database_question)
+          .map((q) => q.question_text) // Use question_text as a unique identifier since original ID won't match
+      );
+
+      setSavedQuestionIds(savedIds);
+    } catch (error) {
+      console.error("Error fetching saved questions:", error);
     }
   };
 
@@ -362,12 +388,64 @@ const Questions = () => {
     }
   };
 
-  // Handle delete question
+  // Modify handleSaveQuestion to update savedQuestionIds
+  const handleSaveQuestion = async (question: ExamQuestion) => {
+    try {
+      // Create a new question object without the id and database-specific fields
+      const newQuestionData = {
+        question_text: question.question_text,
+        year: question.year,
+        subject: question.subject,
+        exam_type: question.exam_type,
+        keywords: question.keywords,
+        options: question.options,
+        correct_answer: question.correct_answer,
+        explanation: question.explanation,
+        question_type: question.question_type,
+        marks: question.marks,
+        is_database_question: false, // This will be a user question
+      };
+
+      await addExamQuestion(newQuestionData);
+
+      // Update the saved questions state
+      setSavedQuestionIds((prev) => new Set([...prev, question.question_text]));
+
+      toast({
+        title: "Success",
+        description: "Question saved to your collection successfully",
+      });
+
+      // Refresh questions if we're in the "My Questions" view
+      if (questionsView === "my") {
+        fetchQuestions();
+      }
+    } catch (error) {
+      console.error("Error saving question:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save the question. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Modify handleDeleteQuestion to update savedQuestionIds
   const handleDeleteQuestion = async (questionId: string) => {
     if (!questionId) return;
 
     try {
+      const questionToDelete = questions.find((q) => q.id === questionId);
+      if (!questionToDelete) return;
+
       await deleteExamQuestion(questionId);
+
+      // Remove from saved questions tracking
+      setSavedQuestionIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(questionToDelete.question_text);
+        return newSet;
+      });
 
       // Update local state after successful deletion
       setQuestions(questions.filter((q) => q.id !== questionId));
@@ -585,8 +663,10 @@ ${
     );
   };
 
-  // Render question actions (buttons for view answer, delete, etc.)
+  // Modify renderQuestionActions to check if question is saved
   const renderQuestionActions = (question: ExamQuestion) => {
+    const isQuestionSaved = savedQuestionIds.has(question.question_text);
+
     return (
       <div className="flex flex-col gap-2">
         <Button
@@ -631,6 +711,17 @@ ${
             }
           >
             View My Answer
+          </Button>
+        )}
+
+        {/* Show Save button only for database questions that haven't been saved */}
+        {question.is_database_question && !isQuestionSaved && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleSaveQuestion(question)}
+          >
+            Save to My Questions
           </Button>
         )}
 
