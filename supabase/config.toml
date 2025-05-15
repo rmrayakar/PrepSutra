@@ -1,4 +1,3 @@
-
 project_id = "ltttwatjtvnnkxmhxnoc"
 
 [functions.generate-model-answer]
@@ -8,4 +7,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.essay-feedback]
+verify_jwt = true
+
+[functions.generate-essay]
 verify_jwt = true

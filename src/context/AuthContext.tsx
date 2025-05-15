@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Handle specific auth events
       if (event === "SIGNED_IN") {
-        toast.success("Successfully signed in!");
+        console.log("Successfully signed in!");
       } else if (event === "SIGNED_OUT") {
         toast.info("You have been signed out");
       } else if (event === "USER_UPDATED") {

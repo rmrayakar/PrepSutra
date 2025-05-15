@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/button";
@@ -10,16 +10,216 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getEssayFeedback } from "@/integrations/supabase/functions";
+import {
+  getEssayFeedback,
+  generateEssay,
+  type GeneratedEssayResponse,
+  type EssayFramework,
+  type CompleteEssay,
+  saveEssay,
+  getUserEssays,
+  getEssayById,
+  updateEssay,
+  deleteEssay,
+} from "@/integrations/supabase/functions";
 import { useToast } from "@/hooks/use-toast";
 import type { EssayFeedbackResponse } from "@/integrations/supabase/functions";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { format } from "date-fns";
+
+const ESSAY_TYPES = [
+  { value: "general", label: "General Essay" },
+  { value: "philosophical", label: "Philosophical" },
+  { value: "sociological", label: "Sociological" },
+  { value: "economic", label: "Economic" },
+  { value: "science_tech", label: "Science & Technology" },
+  { value: "ethics", label: "Ethics & Integrity" },
+  { value: "current_affairs", label: "Current Affairs" },
+  { value: "governance", label: "Governance & Administration" },
+  { value: "international", label: "International Relations" },
+];
+
+const WORD_LIMIT = 1200;
 
 const Essay = () => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [feedback, setFeedback] = useState<EssayFeedbackResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [generatingEssay, setGeneratingEssay] = useState(false);
+  const [essayTopic, setEssayTopic] = useState("");
+  const [essayType, setEssayType] = useState("general");
+  const [generatedEssay, setGeneratedEssay] = useState<CompleteEssay | null>(
+    null
+  );
+  const [savedEssays, setSavedEssays] = useState<any[]>([]);
+  const [currentEssayId, setCurrentEssayId] = useState<string | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [framework, setFramework] = useState<EssayFramework | null>(null);
+  const [generatingComplete, setGeneratingComplete] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    loadSavedEssays();
+  }, []);
+
+  const loadSavedEssays = async () => {
+    try {
+      const essays = await getUserEssays();
+      setSavedEssays(essays);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load saved essays.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!title || !content) {
+      toast({
+        title: "Error",
+        description: "Please provide both title and content for your essay.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSavingDraft(true);
+      let savedEssay;
+
+      // Prepare feedback data
+      const feedbackData = feedback ? JSON.stringify(feedback) : null;
+
+      if (currentEssayId) {
+        savedEssay = await updateEssay(currentEssayId, {
+          title,
+          content,
+          feedback: feedbackData,
+          score: feedback?.overallScore || null,
+        });
+      } else {
+        savedEssay = await saveEssay(
+          title,
+          content,
+          feedbackData,
+          feedback?.overallScore || null
+        );
+        setCurrentEssayId(savedEssay.id);
+      }
+
+      await loadSavedEssays();
+      toast({
+        title: "Success",
+        description: "Essay saved successfully!",
+      });
+    } catch (error) {
+      console.error("Error saving essay:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save essay. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const handleLoadEssay = async (id: string) => {
+    try {
+      const essay = await getEssayById(id);
+      if (!essay) {
+        throw new Error("Essay not found");
+      }
+
+      setTitle(essay.title || "");
+      setContent(essay.content || "");
+      setCurrentEssayId(essay.id);
+
+      // Clear previous feedback
+      setFeedback(null);
+
+      // Parse feedback if it exists
+      if (essay.feedback) {
+        try {
+          const parsedFeedback = JSON.parse(essay.feedback);
+          // Validate the feedback structure
+          if (parsedFeedback.parameters && parsedFeedback.overallScore) {
+            setFeedback(parsedFeedback);
+          }
+        } catch (parseError) {
+          console.error("Error parsing feedback:", parseError);
+          // Don't throw error for feedback parsing issues
+        }
+      }
+
+      toast({
+        title: "Success",
+        description: "Essay loaded successfully!",
+      });
+    } catch (error) {
+      console.error("Error loading essay:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load essay. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteEssay = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this essay?")) {
+      return;
+    }
+
+    try {
+      await deleteEssay(id);
+      await loadSavedEssays();
+      if (currentEssayId === id) {
+        setTitle("");
+        setContent("");
+        setCurrentEssayId(null);
+        setFeedback(null);
+      }
+      toast({
+        title: "Success",
+        description: "Essay deleted successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete essay. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleGetFeedback = async () => {
     if (!title || !content) {
@@ -46,6 +246,226 @@ const Essay = () => {
     }
   };
 
+  const handleGenerateFramework = async () => {
+    if (!essayTopic) {
+      toast({
+        title: "Error",
+        description: "Please enter an essay topic.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setGeneratingEssay(true);
+      const response = await generateEssay(essayTopic, essayType, "framework");
+
+      // Type guard to check if response is a framework
+      if ("framework" in response) {
+        setFramework(response);
+      } else {
+        throw new Error("Invalid framework response from server");
+      }
+
+      toast({
+        title: "Success",
+        description: "Essay framework generated successfully!",
+      });
+    } catch (error) {
+      console.error("Framework generation error:", error);
+      toast({
+        title: "Error",
+        description:
+          error.message ||
+          "Failed to generate essay framework. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingEssay(false);
+    }
+  };
+
+  const handleGenerateComplete = async () => {
+    if (!essayTopic) {
+      toast({
+        title: "Error",
+        description: "Please enter an essay topic.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setGeneratingComplete(true);
+      const response = await generateEssay(essayTopic, essayType, "complete");
+
+      // Type guard to check if response is a complete essay
+      if ("essay" in response) {
+        const completeEssay = response as CompleteEssay;
+
+        if (
+          !completeEssay.essay.introduction ||
+          !completeEssay.essay.body ||
+          !completeEssay.essay.conclusion
+        ) {
+          throw new Error("Invalid essay structure received from the server");
+        }
+
+        setTitle(completeEssay.essay.title || essayTopic);
+
+        // Format the essay content with proper spacing and structure
+        const formattedContent = [
+          completeEssay.essay.introduction,
+          "",
+          ...(completeEssay.essay.body || [])
+            .map((section) => [
+              `${section.heading || "Main Point"}`,
+              section.content || "",
+              "",
+              "Examples:",
+              ...(section.examples || []).map((ex) => `• ${ex}`),
+              "",
+            ])
+            .flat(),
+          "Conclusion:",
+          completeEssay.essay.conclusion,
+        ].join("\n");
+
+        setContent(formattedContent);
+        setCurrentEssayId(null);
+        setFeedback(null);
+        setFramework(null);
+
+        toast({
+          title: "Success",
+          description: "Complete essay generated successfully!",
+        });
+      } else {
+        throw new Error("Invalid response from server");
+      }
+    } catch (error) {
+      console.error("Essay generation error:", error);
+      toast({
+        title: "Error",
+        description:
+          error.message ||
+          "Failed to generate complete essay. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingComplete(false);
+    }
+  };
+
+  const wordCount = content.split(/\s+/).filter(Boolean).length;
+  const isOverWordLimit = wordCount > WORD_LIMIT;
+
+  // Helper function to safely render essay sections
+  const renderEssaySection = () => null;
+
+  // Helper function to safely render examples and connections
+  const renderExamplesAndConnections = () => null;
+
+  // Helper function to safely render writing tips
+  const renderWritingTips = () => null;
+
+  // Helper function to render framework
+  const renderFramework = () => {
+    if (!framework?.framework) return null;
+
+    return (
+      <div className="space-y-6">
+        <div className="border rounded-md p-4 bg-muted/30">
+          <h3 className="font-medium mb-4">Suggested Structure</h3>
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-sm font-medium">Introduction</h4>
+              <p className="text-sm text-muted-foreground mt-1">
+                {framework.framework.suggestedStructure.introduction}
+              </p>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium">Body Paragraphs</h4>
+              <ul className="mt-1 space-y-2">
+                {framework.framework.suggestedStructure.bodyParagraphs.map(
+                  (para, idx) => (
+                    <li key={idx} className="text-sm text-muted-foreground">
+                      {para}
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium">Conclusion</h4>
+              <p className="text-sm text-muted-foreground mt-1">
+                {framework.framework.suggestedStructure.conclusion}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="border rounded-md p-4">
+            <h3 className="font-medium mb-2">Main Points</h3>
+            <div className="space-y-4">
+              {framework.framework.mainPoints.map((point, idx) => (
+                <div key={idx} className="space-y-2">
+                  <h4 className="text-sm font-medium">{point.heading}</h4>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground">
+                    {point.subPoints.map((subPoint, subIdx) => (
+                      <li key={subIdx}>{subPoint}</li>
+                    ))}
+                  </ul>
+                  {point.examples.length > 0 && (
+                    <div className="pl-4">
+                      <p className="text-sm font-medium">Examples:</p>
+                      <ul className="list-disc list-inside text-sm text-muted-foreground">
+                        {point.examples.map((example, exIdx) => (
+                          <li key={exIdx}>{example}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="border rounded-md p-4">
+              <h3 className="font-medium mb-2">UPSC Connections</h3>
+              <ul className="list-disc list-inside text-sm text-muted-foreground">
+                {framework.framework.connections.map((connection, idx) => (
+                  <li key={idx}>{connection}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="border rounded-md p-4 bg-green-50">
+              <h3 className="font-medium mb-2 text-green-800">Writing Tips</h3>
+              <ul className="list-disc list-inside text-sm text-green-700">
+                {framework.framework.tips.map((tip, idx) => (
+                  <li key={idx}>{tip}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <Button
+          onClick={handleGenerateComplete}
+          disabled={generatingComplete}
+          className="w-full"
+        >
+          {generatingComplete
+            ? "Generating Complete Essay..."
+            : "Generate Complete Essay"}
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -53,397 +473,301 @@ const Essay = () => {
         <Sidebar />
         <main className="flex-1 p-6 lg:p-8">
           <div className="space-y-6">
-            <div>
+            <div className="flex justify-between items-center">
               <h2 className="text-3xl font-bold tracking-tight">
                 Essay Builder & Feedback Tool
               </h2>
-              <p className="text-muted-foreground mt-2">
-                Get frameworks for essay topics and receive detailed feedback on
-                your writing
-              </p>
+              <div className="flex gap-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">View Saved Essays</Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                      <DialogTitle>Saved Essays</DialogTitle>
+                      <DialogDescription>
+                        View and manage your saved essays
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[60vh] overflow-y-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Last Updated</TableHead>
+                            <TableHead>Score</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {savedEssays.map((essay) => (
+                            <TableRow key={essay.id}>
+                              <TableCell>{essay.title}</TableCell>
+                              <TableCell>
+                                {format(
+                                  new Date(essay.updated_at),
+                                  "MMM d, yyyy HH:mm"
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {essay.score
+                                  ? `${essay.score}/100`
+                                  : "No score"}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleLoadEssay(essay.id)}
+                                  >
+                                    Load
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleDeleteEssay(essay.id)}
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <Button
+                  onClick={handleSaveDraft}
+                  disabled={savingDraft || !title || !content}
+                >
+                  {savingDraft ? "Saving..." : "Save Draft"}
+                </Button>
+              </div>
             </div>
+            <p className="text-muted-foreground mt-2">
+              Practice writing essays for UPSC with AI-powered feedback and
+              suggestions.
+            </p>
 
             <Card>
               <CardHeader>
-                <CardTitle>Essay Topic Explorer</CardTitle>
+                <CardTitle>Generate Essay Framework</CardTitle>
                 <CardDescription>
-                  Browse previous UPSC essay topics or explore new ones
+                  Get an AI-generated framework to help structure your essay
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div className="flex gap-4">
-                    <input
-                      type="text"
-                      placeholder="Enter an essay topic..."
-                      className="flex-1 rounded-md border p-2"
-                    />
-                    <Button>Get Framework</Button>
-                  </div>
-
-                  <div className="mt-4">
-                    <h3 className="font-medium mb-2">Suggested Topics</h3>
-                    <div className="grid gap-2 grid-cols-1 md:grid-cols-2">
-                      <div className="border rounded-md p-3 hover:bg-accent/50 cursor-pointer">
-                        <p className="font-medium">
-                          Wisdom finds truth, while knowledge covers facts.
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          UPSC 2023
-                        </p>
-                      </div>
-                      <div className="border rounded-md p-3 hover:bg-accent/50 cursor-pointer">
-                        <p className="font-medium">
-                          The time to repair the roof is when the sun is
-                          shining.
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          UPSC 2022
-                        </p>
-                      </div>
-                      <div className="border rounded-md p-3 hover:bg-accent/50 cursor-pointer">
-                        <p className="font-medium">
-                          Inclusivity is the strength of a plural society.
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          UPSC 2022
-                        </p>
-                      </div>
-                      <div className="border rounded-md p-3 hover:bg-accent/50 cursor-pointer">
-                        <p className="font-medium">
-                          Culture is what we give to others; civilization is
-                          what we give to ourselves.
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          UPSC 2021
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="essayType">Essay Type</Label>
+                  <Select value={essayType} onValueChange={setEssayType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select essay type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ESSAY_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Essay Framework</CardTitle>
-                <CardDescription>
-                  AI-generated structure for "Wisdom finds truth, while
-                  knowledge covers facts"
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="framework">
-                  <TabsList className="mb-4">
-                    <TabsTrigger value="framework">Framework</TabsTrigger>
-                    <TabsTrigger value="examples">Examples</TabsTrigger>
-                    <TabsTrigger value="references">References</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="framework">
-                    <div className="space-y-4">
-                      <div className="border-l-4 border-prepsutra-primary pl-4 py-2">
-                        <h3 className="font-medium">Introduction</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Begin with a philosophical quote about wisdom vs.
-                          knowledge. Define both terms clearly. Establish the
-                          thesis that wisdom transcends mere knowledge by
-                          focusing on truth and meaning.
-                        </p>
-                      </div>
-
-                      <div className="border-l-4 border-prepsutra-primary pl-4 py-2">
-                        <h3 className="font-medium">
-                          Body Paragraph 1: The Nature of Knowledge
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Explain how knowledge is acquired, stored, and
-                          transmitted. Discuss its factual, empirical nature.
-                          Highlight both strengths and limitations of knowledge.
-                        </p>
-                      </div>
-
-                      <div className="border-l-4 border-prepsutra-primary pl-4 py-2">
-                        <h3 className="font-medium">
-                          Body Paragraph 2: The Essence of Wisdom
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Contrast wisdom as deeper understanding that comes
-                          through experience, reflection, and insight. Explain
-                          how wisdom involves discernment, judgment, and seeing
-                          beyond facts.
-                        </p>
-                      </div>
-
-                      <div className="border-l-4 border-prepsutra-primary pl-4 py-2">
-                        <h3 className="font-medium">
-                          Body Paragraph 3: Historical Examples
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Provide examples from history where knowledge without
-                          wisdom led to negative outcomes. Contrast with
-                          examples where wisdom guided knowledge toward positive
-                          change.
-                        </p>
-                      </div>
-
-                      <div className="border-l-4 border-prepsutra-primary pl-4 py-2">
-                        <h3 className="font-medium">
-                          Body Paragraph 4: Contemporary Relevance
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Discuss information age challenges – abundance of
-                          knowledge but possible deficit of wisdom. Examine
-                          fields like AI, governance, climate change where this
-                          distinction matters.
-                        </p>
-                      </div>
-
-                      <div className="border-l-4 border-prepsutra-primary pl-4 py-2">
-                        <h3 className="font-medium">Conclusion</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Synthesize arguments to reinforce the complementary
-                          nature of knowledge and wisdom. Emphasize how both are
-                          necessary, but wisdom ultimately guides knowledge
-                          toward truth and meaning.
-                        </p>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="examples">
-                    <div className="space-y-4">
-                      <div className="border rounded-md p-3">
-                        <h3 className="font-medium">
-                          Historical Example: Nuclear Technology
-                        </h3>
-                        <p className="text-sm mt-1">
-                          Knowledge gave us nuclear technology; wisdom
-                          determines whether it powers cities or destroys them.
-                          The Manhattan Project scientists possessed tremendous
-                          knowledge but later advocated for wisdom in its
-                          application. Robert Oppenheimer's famous quote "Now I
-                          am become Death, the destroyer of worlds" reflects
-                          this realization.
-                        </p>
-                      </div>
-
-                      <div className="border rounded-md p-3">
-                        <h3 className="font-medium">
-                          Philosophical Example: Ancient Traditions
-                        </h3>
-                        <p className="text-sm mt-1">
-                          Contrast Socrates' wisdom ("I know that I know
-                          nothing") with the Sophists' knowledge-focused
-                          approach. Similarly, Eastern philosophical traditions
-                          like Buddhism and Taoism emphasize wisdom over
-                          accumulated knowledge.
-                        </p>
-                      </div>
-
-                      <div className="border rounded-md p-3">
-                        <h3 className="font-medium">
-                          Contemporary Example: Information Overload
-                        </h3>
-                        <p className="text-sm mt-1">
-                          In today's information age, we have unprecedented
-                          access to knowledge via the internet, yet face
-                          challenges like misinformation and echo chambers.
-                          Wisdom is needed to discern reliable information,
-                          understand context, and apply knowledge ethically.
-                        </p>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="references">
-                    <div className="space-y-4">
-                      <div className="border rounded-md p-3">
-                        <h3 className="font-medium">
-                          Philosophical References
-                        </h3>
-                        <ul className="list-disc list-inside text-sm mt-1 space-y-1">
-                          <li>
-                            Aristotle's distinction between episteme (knowledge)
-                            and phronesis (practical wisdom)
-                          </li>
-                          <li>Kant's views on the limits of pure reason</li>
-                          <li>
-                            Indian philosophical concepts of jnana (knowledge)
-                            and prajna (wisdom)
-                          </li>
-                        </ul>
-                      </div>
-
-                      <div className="border rounded-md p-3">
-                        <h3 className="font-medium">Literature & Quotations</h3>
-                        <ul className="list-disc list-inside text-sm mt-1 space-y-1">
-                          <li>
-                            "Knowledge comes, but wisdom lingers." - Alfred Lord
-                            Tennyson
-                          </li>
-                          <li>
-                            "The only true wisdom is in knowing you know
-                            nothing." - Socrates
-                          </li>
-                          <li>
-                            "Wisdom is not a product of schooling but of the
-                            lifelong attempt to acquire it." - Albert Einstein
-                          </li>
-                        </ul>
-                      </div>
-
-                      <div className="border rounded-md p-3">
-                        <h3 className="font-medium">Contemporary Thinkers</h3>
-                        <ul className="list-disc list-inside text-sm mt-1 space-y-1">
-                          <li>
-                            Daniel Kahneman's work on cognitive biases and
-                            decision-making
-                          </li>
-                          <li>
-                            Yuval Noah Harari's discussions on knowledge in the
-                            information age
-                          </li>
-                          <li>
-                            Amartya Sen's capability approach that extends
-                            beyond mere knowledge
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Essay Writer</CardTitle>
-                <CardDescription>
-                  Write your essay and get AI feedback
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4">
-                  <div>
-                    <input
-                      type="text"
-                      placeholder="Enter essay title..."
-                      className="w-full rounded-md border p-2 mb-4"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                    />
-                    <textarea
-                      className="w-full h-64 rounded-md border p-3"
-                      placeholder="Start writing your essay here..."
-                      value={content}
-                      onChange={(e) => setContent(e.target.value)}
-                    ></textarea>
-                  </div>
-                  <div className="flex justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        Word count:{" "}
-                        {content.split(/\s+/).filter(Boolean).length}/1000
-                      </p>
-                    </div>
-                    <div className="space-x-2">
-                      <Button variant="outline">Save Draft</Button>
-                      <Button onClick={handleGetFeedback} disabled={loading}>
-                        {loading ? "Getting Feedback..." : "Get Feedback"}
-                      </Button>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="essayTopic">Essay Topic</Label>
+                  <Input
+                    id="essayTopic"
+                    value={essayTopic}
+                    onChange={(e) => setEssayTopic(e.target.value)}
+                    placeholder="Enter your essay topic"
+                  />
                 </div>
+                <Button
+                  onClick={handleGenerateFramework}
+                  disabled={generatingEssay}
+                  className="w-full"
+                >
+                  {generatingEssay
+                    ? "Generating Framework..."
+                    : "Generate Framework"}
+                </Button>
               </CardContent>
             </Card>
 
-            {feedback && (
+            {framework && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Feedback Analysis</CardTitle>
+                  <CardTitle>Essay Framework</CardTitle>
                   <CardDescription>
-                    AI-powered review of your essay
+                    Use this framework to structure your essay
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid gap-6 md:grid-cols-2">
-                    <div className="space-y-4">
-                      {Object.entries(feedback.parameters).map(
-                        ([key, value]) => (
-                          <div key={key}>
-                            <h3 className="font-medium capitalize">
-                              {key.replace(/([A-Z])/g, " $1").trim()}
-                            </h3>
-                            <div className="flex items-center mt-1">
-                              <div className="h-2 flex-1 bg-gray-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-prepsutra-primary rounded-full"
-                                  style={{
-                                    width: `${(value.score / 10) * 100}%`,
-                                  }}
-                                ></div>
-                              </div>
-                              <span className="ml-2 text-sm">
-                                {value.score}/10
-                              </span>
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {value.feedback}
-                            </p>
-                            <p className="text-sm text-muted-foreground mt-1">
-                              <strong>Suggestions:</strong> {value.suggestions}
-                            </p>
-                          </div>
-                        )
-                      )}
-                    </div>
+                <CardContent>{renderFramework()}</CardContent>
+              </Card>
+            )}
 
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="font-medium">Overall Score</h3>
-                        <div className="flex items-center mt-1">
-                          <div className="h-2 flex-1 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-prepsutra-primary rounded-full"
-                              style={{ width: `${feedback.overallScore}%` }}
-                            ></div>
-                          </div>
-                          <span className="ml-2 text-sm">
-                            {feedback.overallScore}/100
-                          </span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 className="font-medium">General Feedback</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {feedback.generalFeedback}
-                        </p>
-                      </div>
-
-                      <div>
-                        <h3 className="font-medium">Strengths</h3>
-                        <ul className="list-disc list-inside text-sm text-muted-foreground mt-1">
-                          {feedback.strengths.map((strength, index) => (
-                            <li key={index}>{strength}</li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      <div>
-                        <h3 className="font-medium">Areas for Improvement</h3>
-                        <ul className="list-disc list-inside text-sm text-muted-foreground mt-1">
-                          {feedback.improvementAreas.map((area, index) => (
-                            <li key={index}>{area}</li>
-                          ))}
-                        </ul>
+            <div className="grid gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Write Your Essay</CardTitle>
+                  <CardDescription>
+                    Write your essay and get AI-powered feedback
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Essay Title</Label>
+                    <Input
+                      id="title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Enter your essay title"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="content">Essay Content</Label>
+                    <div className="relative">
+                      <Textarea
+                        id="content"
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        placeholder="Write your essay here..."
+                        className="min-h-[400px]"
+                      />
+                      <br />
+                      <br />
+                      <div
+                        className={`absolute bottom-2 right-2 text-sm ${
+                          isOverWordLimit
+                            ? "text-red-500"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {wordCount}/{WORD_LIMIT} words
                       </div>
                     </div>
+                  </div>
+                  <div className="flex justify-end gap-4">
+                    <Button
+                      variant="outline"
+                      onClick={handleSaveDraft}
+                      disabled={savingDraft || !title || !content}
+                    >
+                      {savingDraft ? "Saving..." : "Save Draft"}
+                    </Button>
+                    <Button
+                      onClick={handleGetFeedback}
+                      disabled={loading || !title || !content}
+                    >
+                      {loading ? "Getting Feedback..." : "Get Feedback"}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
-            )}
+
+              {feedback && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Essay Feedback</CardTitle>
+                    <CardDescription>
+                      AI-powered feedback and suggestions for improvement
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <h3 className="font-medium">Overall Score</h3>
+                        <div className="text-3xl font-bold">
+                          {feedback.overallScore}/100
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="font-medium">General Feedback</h3>
+                        <p className="text-muted-foreground">
+                          {feedback.generalFeedback}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h3 className="font-medium">Detailed Analysis</h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {Object.entries(feedback.parameters).map(
+                          ([key, value]: [string, any]) => (
+                            <Card key={key}>
+                              <CardHeader>
+                                <CardTitle className="text-base">
+                                  {key
+                                    .replace(/([A-Z])/g, " $1")
+                                    .split("And")
+                                    .join(" & ")
+                                    .trim()}
+                                </CardTitle>
+                                <CardDescription>
+                                  Score: {value.score}/100
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent className="space-y-2">
+                                <p className="text-sm">{value.feedback}</p>
+                                {value.suggestions && (
+                                  <div>
+                                    <p className="text-sm font-medium mt-2">
+                                      Suggestions:
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {value.suggestions}
+                                    </p>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div>
+                        <h3 className="font-medium mb-2">Strengths</h3>
+                        <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                          {feedback.strengths.map((strength, idx) => (
+                            <li key={idx}>{strength}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-2">Weaknesses</h3>
+                        <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                          {feedback.weaknesses.map((weakness, idx) => (
+                            <li key={idx}>{weakness}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <h3 className="font-medium mb-2">
+                          Areas for Improvement
+                        </h3>
+                        <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                          {feedback.improvementAreas.map((area, idx) => (
+                            <li key={idx}>{area}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleSaveDraft}
+                      disabled={savingDraft}
+                      className="w-full"
+                    >
+                      {savingDraft ? "Saving..." : "Save Essay with Feedback"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         </main>
       </div>

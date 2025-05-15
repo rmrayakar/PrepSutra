@@ -1,8 +1,8 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.1.3";
 
-const openAIApiKey = Deno.env.get("OPENAI_API_KEY");
+const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,9 +19,9 @@ serve(async (req) => {
   try {
     const { title, content } = await req.json();
 
-    if (!openAIApiKey) {
+    if (!geminiApiKey) {
       return new Response(
-        JSON.stringify({ error: "OpenAI API key not configured" }),
+        JSON.stringify({ error: "Gemini API key not configured" }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -47,7 +47,7 @@ serve(async (req) => {
     Essay Content:
     ${content}
 
-    Please evaluate the essay on the following parameters and provide a score out of 10 for each:
+    Please evaluate the essay on the following parameters and provide a score out of 100 for each:
     1. Introduction and Conclusion
     2. Content and Substance
     3. Structure and Organization
@@ -105,48 +105,50 @@ serve(async (req) => {
       "weaknesses": ["", "", ""],
       "improvementAreas": ["", "", ""]
     }
+
+    IMPORTANT: Return ONLY the JSON object, no other text.
     `;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openAIApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are an expert UPSC essay evaluator with decades of experience.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
-      }),
-    });
+    // Initialize Gemini
+    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    const result = await response.json();
-    const feedbackText = result.choices[0].message.content;
-    
-    // Parse the JSON response from the AI
+    // Generate content
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const feedbackText = response.text();
+
+    // Parse the JSON response
     let feedback;
     try {
-      // Extract JSON from the response text (handles case where AI might add extra text)
+      // Extract JSON from the response text
       const jsonMatch = feedbackText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         feedback = JSON.parse(jsonMatch[0]);
       } else {
         throw new Error("Could not extract JSON from response");
       }
+
+      // Validate the feedback structure
+      if (!feedback.parameters || !feedback.overallScore) {
+        throw new Error("Invalid feedback structure");
+      }
+
+      // Ensure all scores are numbers between 0 and 100
+      Object.values(feedback.parameters).forEach((param: any) => {
+        param.score = Math.min(100, Math.max(0, Number(param.score)));
+      });
+      feedback.overallScore = Math.min(
+        100,
+        Math.max(0, Number(feedback.overallScore))
+      );
     } catch (error) {
       console.error("Error parsing AI response as JSON:", error);
       console.log("Original response:", feedbackText);
       return new Response(
-        JSON.stringify({ 
-          error: "Failed to parse feedback result", 
-          rawResponse: feedbackText 
+        JSON.stringify({
+          error: "Failed to parse feedback result",
+          rawResponse: feedbackText,
         }),
         {
           status: 500,

@@ -54,6 +54,40 @@ export interface EssayFeedbackResponse {
   improvementAreas: string[];
 }
 
+export interface EssayFramework {
+  framework: {
+    title: string;
+    mainPoints: Array<{
+      heading: string;
+      subPoints: string[];
+      examples: string[];
+    }>;
+    suggestedStructure: {
+      introduction: string;
+      bodyParagraphs: string[];
+      conclusion: string;
+    };
+    connections: string[];
+    examples: string[];
+    tips: string[];
+  };
+}
+
+export interface CompleteEssay {
+  essay: {
+    title: string;
+    introduction: string;
+    body: Array<{
+      heading: string;
+      content: string;
+      examples: string[];
+    }>;
+    conclusion: string;
+  };
+}
+
+export type GeneratedEssayResponse = EssayFramework | CompleteEssay;
+
 export const generateModelAnswer = async (
   topic: string,
   question: string
@@ -87,6 +121,19 @@ export const getEssayFeedback = async (
 ): Promise<EssayFeedbackResponse> => {
   const { data, error } = await supabase.functions.invoke("essay-feedback", {
     body: { title, content },
+  });
+
+  if (error) throw error;
+  return data;
+};
+
+export const generateEssay = async (
+  topic: string,
+  essayType?: string,
+  mode: "framework" | "complete" = "framework"
+): Promise<GeneratedEssayResponse> => {
+  const { data, error } = await supabase.functions.invoke("generate-essay", {
+    body: { topic, essayType, mode },
   });
 
   if (error) throw error;
@@ -457,4 +504,117 @@ export const updateExamQuestion = async (
 
   if (error) throw error;
   return data;
+};
+
+// Essay Functions
+export const saveEssay = async (
+  title: string,
+  content: string,
+  feedback: string | null = null,
+  score: number | null = null
+) => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("User must be authenticated to save essays");
+  }
+
+  const { data, error } = await supabase
+    .from("essays")
+    .insert({
+      title,
+      content,
+      feedback,
+      score,
+      user_id: user.id,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const updateEssay = async (
+  id: string,
+  updates: Partial<TablesInsert<"essays">>
+) => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("User must be authenticated to update essays");
+  }
+
+  const { data, error } = await supabase
+    .from("essays")
+    .update(updates)
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const getUserEssays = async () => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("User must be authenticated to get essays");
+  }
+
+  const { data, error } = await supabase
+    .from("essays")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+  return data;
+};
+
+export const getEssayById = async (id: string) => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("User must be authenticated to get essays");
+  }
+
+  const { data, error } = await supabase
+    .from("essays")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const deleteEssay = async (id: string) => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("User must be authenticated to delete essays");
+  }
+
+  const { error } = await supabase
+    .from("essays")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+
+  if (error) throw error;
+  return true;
 };
