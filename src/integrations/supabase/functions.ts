@@ -285,28 +285,61 @@ export const submitAnswer = async (questionId: string, answerText: string) => {
 
   if (questionError) throw questionError;
 
-  // Calculate similarity and awarded marks
-  const { similarity_score, awarded_marks } = await calculateAnswerScore(
-    answerText,
-    question.correct_answer || "",
-    question.marks
-  );
+  let similarity_score = null;
+  let awarded_marks = 0;
 
-  // Insert or update the answer
-  const { data, error } = await supabase
-    .from("question_answers")
-    .upsert({
-      question_id: questionId,
-      user_id: user.id,
-      answer_text: answerText,
-      similarity_score,
-      awarded_marks,
-    })
-    .select()
-    .single();
+  try {
+    // For MCQ questions, use exact match
+    if (question.question_type === "mcq") {
+      // Generate model answer for MCQ validation
+      const response = await generateModelAnswer(
+        question.subject,
+        question.question_text
+      );
+      const modelAnswer = response.modelAnswer.trim().toUpperCase();
+      // Check if user's answer matches any of the valid options (A, B, C, D)
+      similarity_score = ["A", "B", "C", "D"].includes(
+        answerText.trim().toUpperCase()
+      )
+        ? answerText.trim().toUpperCase() === modelAnswer
+          ? 1
+          : 0
+        : 0;
+      awarded_marks = similarity_score * question.marks;
+    } else {
+      // For descriptive questions, use Gemini API to evaluate
+      const response = await generateModelAnswer(
+        question.subject,
+        question.question_text
+      );
+      const result = await calculateAnswerScore(
+        answerText,
+        response.modelAnswer,
+        question.marks
+      );
+      similarity_score = result.similarity_score;
+      awarded_marks = result.awarded_marks;
+    }
 
-  if (error) throw error;
-  return data;
+    // Insert or update the answer
+    const { data, error } = await supabase
+      .from("question_answers")
+      .upsert({
+        question_id: questionId,
+        user_id: user.id,
+        answer_text: answerText,
+        similarity_score,
+        awarded_marks,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error submitting answer:", error);
+    throw error;
+  }
 };
 
 // Get user's answer to a specific question

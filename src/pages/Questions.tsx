@@ -333,10 +333,18 @@ const Questions = () => {
   const handleGenerateAnswer = async (question: ExamQuestion) => {
     if (!question) return;
 
+    // If the question is already selected, hide the answer
+    if (selectedQuestion?.id === question.id) {
+      setSelectedQuestion(null);
+      setModelAnswer(null);
+      return;
+    }
+
     try {
       setAnswerLoading(true);
       setSelectedQuestion(question);
 
+      // Generate model answer using Gemini API
       const response = await generateModelAnswer(
         question.subject,
         question.question_text
@@ -346,7 +354,7 @@ const Questions = () => {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to generate model answer. Please try again.",
+        description: "Failed to load answer. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -384,30 +392,122 @@ const Questions = () => {
 
     try {
       setSubmittingAnswer(true);
+      const question = questions.find((q) => q.id === questionId);
 
-      // Submit the answer to the backend
-      const answer = await submitAnswer(questionId, answerText);
+      if (!question) {
+        throw new Error("Question not found");
+      }
 
-      // Update local state with the new answer
-      setAnswers({
-        ...answers,
-        [questionId]: answer,
-      });
+      let modelAnswerText = "";
+      let answerEvaluation = {
+        id: questionId,
+        question_id: questionId,
+        user_id: "local",
+        answer_text: answerText,
+        similarity_score: 0,
+        awarded_marks: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-      // Reset the active answer
+      // Different handling for MCQ vs descriptive questions
+      if (question.question_type === "mcq") {
+        // For MCQ, get the model answer first
+        const mcqResponse = await generateModelAnswer(
+          question.subject,
+          `This is a multiple choice question. Please provide ONLY the correct option letter (A, B, C, or D) without any explanation.
+
+          Question: ${question.question_text}
+          Options:
+          ${question.options
+            ?.map((opt, idx) => `${String.fromCharCode(65 + idx)}. ${opt}`)
+            .join("\n")}
+          `
+        );
+
+        // Extract just the option letter from response
+        const correctAnswer = mcqResponse.modelAnswer.trim().charAt(0);
+        const userAnswer = answerText.trim().toUpperCase().charAt(0);
+        const isCorrect = correctAnswer === userAnswer;
+
+        // Create evaluation text
+        modelAnswerText = `Score: ${isCorrect ? question.marks : 0}
+Explanation: ${
+          isCorrect ? "Correct! " : "Incorrect. "
+        }You selected option ${userAnswer}.
+The correct answer is option ${correctAnswer}: ${
+          question.options?.[correctAnswer.charCodeAt(0) - 65]
+        }
+
+Key Points Covered:
+${
+  isCorrect
+    ? "• Selected the correct option\n• Demonstrated understanding of the concept"
+    : "• Selected incorrect option\n• Review the concept carefully"
+}
+
+Areas for Improvement:
+${
+  isCorrect
+    ? "• Continue practicing similar questions to maintain understanding"
+    : `• Review why option ${correctAnswer} is the correct answer\n• Understand the key concepts related to this question`
+}`;
+
+        answerEvaluation = {
+          ...answerEvaluation,
+          similarity_score: isCorrect ? 1 : 0,
+          awarded_marks: isCorrect ? question.marks : 0,
+        };
+      } else {
+        // For descriptive questions, use the existing evaluation logic
+        const descResponse = await generateModelAnswer(
+          question.subject,
+          `Please evaluate this answer for the following question and provide:
+          1. A score out of ${question.marks} marks
+          2. Detailed explanation of the evaluation
+          3. Key points covered correctly
+          4. Areas of improvement
+          
+          Question: ${question.question_text}
+          
+          Student's Answer: ${answerText}
+          
+          Format your response as:
+          Score: [number]
+          Explanation: [detailed explanation]
+          Key Points Covered: [bullet points]
+          Areas for Improvement: [bullet points]`
+        );
+
+        modelAnswerText = descResponse.modelAnswer;
+        answerEvaluation = {
+          ...answerEvaluation,
+          awarded_marks: parseFloat(
+            descResponse.modelAnswer.match(/Score:\s*(\d+\.?\d*)/)?.[1] || "0"
+          ),
+        };
+      }
+
+      // Update states
+      setAnswers((prev) => ({
+        ...prev,
+        [questionId]: answerEvaluation,
+      }));
+
       setActiveAnswer(null);
+      setSelectedQuestion(question);
+      setModelAnswer(modelAnswerText);
 
       toast({
-        title: "Success",
-        description: `Answer submitted successfully. Score: ${
-          answer.awarded_marks?.toFixed(2) || 0
-        }/${questions.find((q) => q.id === questionId)?.marks || 0}`,
+        title: "Answer Evaluated",
+        description:
+          "Your answer has been evaluated by AI. Check the response for detailed feedback.",
       });
     } catch (error) {
-      console.error("Error submitting answer:", error);
+      console.error("Error evaluating answer:", error);
       toast({
         title: "Error",
-        description: "Failed to submit your answer. Please try again.",
+        description: "Failed to evaluate your answer. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -441,56 +541,12 @@ const Questions = () => {
                 </div>
               ))}
             </div>
-
-            <div className="mt-4">
-              <Label htmlFor="correct-answer">Correct Answer</Label>
-              <br />
-              <Select
-                value={newQuestion.correct_answer || ""}
-                onValueChange={(value) =>
-                  setNewQuestion({
-                    ...newQuestion,
-                    correct_answer: value,
-                  })
-                }
-              >
-                <SelectTrigger id="correct-answer">
-                  <SelectValue placeholder="Select correct answer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A">Option A</SelectItem>
-                  <SelectItem value="B">Option B</SelectItem>
-                  <SelectItem value="C">Option C</SelectItem>
-                  <SelectItem value="D">Option D</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         );
-
-      case "match":
-        return (
-          <div className="flex flex-col">
-            <Label>Matching Items</Label>
-            <br />
-            <p className="text-sm text-gray-500 mb-2">
-              Include the matching items in the question content directly.
-            </p>
-          </div>
-        );
-
+      case "descriptive":
+      case "short_answer":
       case "case_study":
-        return (
-          <div className="flex flex-col">
-            <Label>Case Study</Label>
-            <br />
-            <p className="text-sm text-gray-500 mb-2">
-              Add the case study scenario followed by the related questions in
-              the question content.
-            </p>
-          </div>
-        );
-
+        return null;
       default:
         return null;
     }
@@ -505,26 +561,16 @@ const Questions = () => {
       question.options.length > 0
     ) {
       return (
-        <>
-          <div className="mt-3 space-y-2">
-            {question.options.map((option, idx) => (
-              <div key={idx} className="flex gap-2">
-                <span className="font-medium">
-                  {String.fromCharCode(65 + idx)}.
-                </span>
-                <p>{option}</p>
-              </div>
-            ))}
-          </div>
-
-          {question.correct_answer && (
-            <div className="mt-3">
-              <p className="font-medium">
-                Correct Answer: {question.correct_answer}
-              </p>
+        <div className="mt-3 space-y-2">
+          {question.options.map((option, idx) => (
+            <div key={idx} className="flex gap-2">
+              <span className="font-medium">
+                {String.fromCharCode(65 + idx)}.
+              </span>
+              <p>{option}</p>
             </div>
-          )}
-        </>
+          ))}
+        </div>
       );
     }
 
@@ -550,7 +596,9 @@ const Questions = () => {
           disabled={answerLoading}
         >
           {answerLoading && selectedQuestion?.id === question.id
-            ? "Generating..."
+            ? "Loading..."
+            : selectedQuestion?.id === question.id
+            ? "Hide Answer"
             : "View Answer"}
         </Button>
 
@@ -607,15 +655,14 @@ const Questions = () => {
       activeAnswer && activeAnswer.questionId === question.id;
 
     if (isActiveQuestion) {
-      // Render answer submission form
       return (
         <div className="mt-4 p-4 bg-muted/30 rounded-md">
           <h4 className="font-medium mb-2">Submit Your Answer:</h4>
 
-          {question.question_type === "mcq" && question.options ? (
+          {question.question_type === "mcq" ? (
             // MCQ Answer submission
             <div className="space-y-2 mb-4">
-              {question.options.map((option, idx) => (
+              {question.options?.map((option, idx) => (
                 <div key={idx} className="flex items-center space-x-2">
                   <input
                     type="radio"
@@ -645,7 +692,7 @@ const Questions = () => {
           ) : (
             // Descriptive answer submission
             <Textarea
-              rows={4}
+              rows={6}
               placeholder="Type your answer here..."
               value={activeAnswer.answerText}
               onChange={(e) =>
@@ -654,7 +701,7 @@ const Questions = () => {
                   answerText: e.target.value,
                 })
               }
-              className="mb-2"
+              className="mb-2 w-full"
             />
           )}
 
@@ -685,17 +732,29 @@ const Questions = () => {
           <div className="flex justify-between items-start mb-2">
             <h4 className="font-medium">Your Answer:</h4>
             <div className="text-sm bg-green-100 text-green-800 py-1 px-2 rounded">
-              Score: {answer.awarded_marks?.toFixed(2) || 0}/{question.marks}(
-              {Math.round((answer.similarity_score || 0) * 100)}% match)
+              Score: {answer.awarded_marks?.toFixed(2) || 0}/{question.marks}
+              {answer.similarity_score !== null && (
+                <span>
+                  {" "}
+                  ({Math.round((answer.similarity_score || 0) * 100)}% match)
+                </span>
+              )}
             </div>
           </div>
-          <p className="text-sm">
+          <div className="text-sm whitespace-pre-wrap">
             {question.question_type === "mcq" ? (
-              <span>Option {answer.answer_text}</span>
+              <div className="flex items-center gap-2">
+                <span>Selected Option: {answer.answer_text}</span>
+                {question.options && (
+                  <span className="text-gray-600">
+                    ({question.options[answer.answer_text.charCodeAt(0) - 65]})
+                  </span>
+                )}
+              </div>
             ) : (
               answer.answer_text
             )}
-          </p>
+          </div>
         </div>
       );
     }
@@ -1151,7 +1210,7 @@ const Questions = () => {
                                   </p>
                                 </div>
                               )}
-
+                            {/* 
                             {question.explanation && (
                               <div className="mt-4 p-4 bg-blue-50 rounded-md">
                                 <h4 className="font-medium mb-2">
@@ -1161,7 +1220,7 @@ const Questions = () => {
                                   {question.explanation}
                                 </p>
                               </div>
-                            )}
+                            )} */}
                           </div>
                         ))
                     )}
