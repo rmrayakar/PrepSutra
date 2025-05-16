@@ -7,6 +7,7 @@ import {
   FileText,
   Newspaper,
   User,
+  FolderOpen,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -35,6 +36,11 @@ const sidebarItems = [
     title: "Essay Builder",
     icon: FileText,
     path: "/essay",
+  },
+  {
+    title: "Resources",
+    icon: FolderOpen,
+    path: "/resources",
   },
   {
     title: "Profile",
@@ -72,7 +78,11 @@ const Sidebar = () => {
 
           {/* Brand Section */}
           <div className="flex items-center gap-2 mb-8 mt-2">
-            <img src="icon.png" className="h-6 w-6 text-prepsutra-primary" alt="icon" />
+            <img
+              src="icon.png"
+              className="h-6 w-6 text-prepsutra-primary"
+              alt="icon"
+            />
             <span className="font-heading text-lg font-bold">PrepSutra</span>
           </div>
 
@@ -110,7 +120,6 @@ const Sidebar = () => {
           </div>
         </aside>
       )}
-
     </div>
   );
 };

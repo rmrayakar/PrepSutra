@@ -641,7 +641,7 @@ const Planner = () => {
                     className="rounded-md border shadow-sm pointer-events-auto"
                     components={{
                       DayContent: ({ date }) => (
-                        <div className="flex flex-col items-center">
+                        <div className="flex flex-col items-center ">
                           <span>{date.getDate()}</span>
                           {getTaskIndicators(date)}
                         </div>
@@ -651,7 +651,7 @@ const Planner = () => {
                   </div>
                   </div>
                   {selectedDateTasks.length > 0 && (
-                    <div className="mt-4 space-y-2">
+                    <div className="mt-4 space-y-2 max-h-[700px] overflow-y-auto">
                       <h3 className="font-medium">
                         Tasks for {date?.toLocaleDateString()}
                       </h3>
@@ -683,371 +683,7 @@ const Planner = () => {
               </Card>
 
               <div className="md:col-span-8 space-y-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
-                      <CardTitle>Daily Schedule</CardTitle>
-                      <CardDescription>
-                        {date
-                          ? date.toLocaleDateString("en-US", {
-                              weekday: "long",
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            })
-                          : "No date selected"}
-                      </CardDescription>
-                    </div>
-                    <Dialog
-                      open={showNewTaskDialog}
-                      onOpenChange={setShowNewTaskDialog}
-                    >
-                      <DialogTrigger asChild>
-                        <Button disabled={!selectedPlanId}>Add Task</Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Add New Task</DialogTitle>
-                          <DialogDescription>
-                            Create a new task for your study plan
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <Select
-                            value={newTask.plan_id}
-                            onValueChange={(value) =>
-                              setNewTask({ ...newTask, plan_id: value })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select Study Plan" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {studyPlans.map((plan) => (
-                                <SelectItem key={plan.id} value={plan.id}>
-                                  {plan.title}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            placeholder="Task Title"
-                            value={newTask.title}
-                            onChange={(e) =>
-                              setNewTask({ ...newTask, title: e.target.value })
-                            }
-                          />
-                          <Textarea
-                            placeholder="Task Description"
-                            value={newTask.description}
-                            onChange={(e) =>
-                              setNewTask({
-                                ...newTask,
-                                description: e.target.value,
-                              })
-                            }
-                          />
-                          <Input
-                            type="datetime-local"
-                            value={newTask.due_date}
-                            onChange={(e) =>
-                              setNewTask({
-                                ...newTask,
-                                due_date: e.target.value,
-                              })
-                            }
-                          />
-                          <Select
-                            value={newTask.priority}
-                            onValueChange={(value: "low" | "medium" | "high") =>
-                              setNewTask({ ...newTask, priority: value })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select Priority" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="low">Low</SelectItem>
-                              <SelectItem value="medium">Medium</SelectItem>
-                              <SelectItem value="high">High</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <DialogFooter>
-                          <Button onClick={handleCreateTask}>
-                            Create Task
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </CardHeader>
-                  <CardContent>
-                    <Tabs defaultValue="all">
-                      <TabsList className="mb-4">
-                        <TabsTrigger value="all">All Tasks</TabsTrigger>
-                        <TabsTrigger value="pending">Pending</TabsTrigger>
-                        <TabsTrigger value="completed">Completed</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="all" className="space-y-4">
-                        {tasks.map((task) => {
-                          const dueDate = formatDueDate(task.due_date);
-                          return (
-                            <div
-                              key={task.id}
-                              className="rounded-md border p-4"
-                            >
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <h3 className="font-medium">{task.title}</h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    {task.description}
-                                  </p>
-                                  <div className="mt-2 flex items-center gap-2">
-                                    {dueDate && (
-                                      <div className="flex flex-col gap-1">
-                                        <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
-                                          {dueDate.date}
-                                        </span>
-                                        <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
-                                          {dueDate.time}
-                                        </span>
-                                      </div>
-                                    )}
-                                    <span
-                                      className={`text-xs py-1 px-2 rounded-full ${
-                                        task.priority === "high"
-                                          ? "bg-red-100 text-red-700"
-                                          : task.priority === "medium"
-                                          ? "bg-amber-100 text-amber-700"
-                                          : "bg-green-100 text-green-700"
-                                      }`}
-                                    >
-                                      {task.priority.charAt(0).toUpperCase() +
-                                        task.priority.slice(1)}{" "}
-                                      Priority
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Select
-                                    value={task.status}
-                                    onValueChange={(
-                                      value:
-                                        | "pending"
-                                        | "in_progress"
-                                        | "completed"
-                                    ) => handleUpdateTaskStatus(task.id, value)}
-                                  >
-                                    <SelectTrigger className="w-[140px]">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="pending">
-                                        Pending
-                                      </SelectItem>
-                                      <SelectItem value="in_progress">
-                                        In Progress
-                                      </SelectItem>
-                                      <SelectItem value="completed">
-                                        Completed
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => {
-                                      setTaskToDelete(task.id);
-                                      setShowDeleteTaskDialog(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </TabsContent>
-                      <TabsContent value="pending" className="space-y-4">
-                        {tasks
-                          .filter((task) => task.status === "pending")
-                          .map((task) => {
-                            const dueDate = formatDueDate(task.due_date);
-                            return (
-                              <div
-                                key={task.id}
-                                className="rounded-md border p-4"
-                              >
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <h3 className="font-medium">
-                                      {task.title}
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground">
-                                      {task.description}
-                                    </p>
-                                    <div className="mt-2 flex items-center gap-2">
-                                      {dueDate && (
-                                        <div className="flex flex-col gap-1">
-                                          <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
-                                            {dueDate.date}
-                                          </span>
-                                          <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
-                                            {dueDate.time}
-                                          </span>
-                                        </div>
-                                      )}
-                                      <span
-                                        className={`text-xs py-1 px-2 rounded-full ${
-                                          task.priority === "high"
-                                            ? "bg-red-100 text-red-700"
-                                            : task.priority === "medium"
-                                            ? "bg-amber-100 text-amber-700"
-                                            : "bg-green-100 text-green-700"
-                                        }`}
-                                      >
-                                        {task.priority.charAt(0).toUpperCase() +
-                                          task.priority.slice(1)}{" "}
-                                        Priority
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Select
-                                      value={task.status}
-                                      onValueChange={(
-                                        value:
-                                          | "pending"
-                                          | "in_progress"
-                                          | "completed"
-                                      ) =>
-                                        handleUpdateTaskStatus(task.id, value)
-                                      }
-                                    >
-                                      <SelectTrigger className="w-[140px]">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="pending">
-                                          Pending
-                                        </SelectItem>
-                                        <SelectItem value="in_progress">
-                                          In Progress
-                                        </SelectItem>
-                                        <SelectItem value="completed">
-                                          Completed
-                                        </SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => {
-                                        setTaskToDelete(task.id);
-                                        setShowDeleteTaskDialog(true);
-                                      }}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                      </TabsContent>
-                      <TabsContent value="completed" className="space-y-4">
-                        {tasks
-                          .filter((task) => task.status === "completed")
-                          .map((task) => {
-                            const dueDate = formatDueDate(task.due_date);
-                            return (
-                              <div
-                                key={task.id}
-                                className="rounded-md border p-4"
-                              >
-                                <div className="flex items-start justify-between">
-                                  <div>
-                                    <h3 className="font-medium">
-                                      {task.title}
-                                    </h3>
-                                    <p className="text-sm text-muted-foreground">
-                                      {task.description}
-                                    </p>
-                                    <div className="mt-2 flex items-center gap-2">
-                                      {dueDate && (
-                                        <div className="flex flex-col gap-1">
-                                          <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
-                                            {dueDate.date}
-                                          </span>
-                                          <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
-                                            {dueDate.time}
-                                          </span>
-                                        </div>
-                                      )}
-                                      <span
-                                        className={`text-xs py-1 px-2 rounded-full ${
-                                          task.priority === "high"
-                                            ? "bg-red-100 text-red-700"
-                                            : task.priority === "medium"
-                                            ? "bg-amber-100 text-amber-700"
-                                            : "bg-green-100 text-green-700"
-                                        }`}
-                                      >
-                                        {task.priority.charAt(0).toUpperCase() +
-                                          task.priority.slice(1)}{" "}
-                                        Priority
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Select
-                                      value={task.status}
-                                      onValueChange={(
-                                        value:
-                                          | "pending"
-                                          | "in_progress"
-                                          | "completed"
-                                      ) =>
-                                        handleUpdateTaskStatus(task.id, value)
-                                      }
-                                    >
-                                      <SelectTrigger className="w-[140px]">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="pending">
-                                          Pending
-                                        </SelectItem>
-                                        <SelectItem value="in_progress">
-                                          In Progress
-                                        </SelectItem>
-                                        <SelectItem value="completed">
-                                          Completed
-                                        </SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => {
-                                        setTaskToDelete(task.id);
-                                        setShowDeleteTaskDialog(true);
-                                      }}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                      </TabsContent>
-                    </Tabs>
-                  </CardContent>
-                </Card>
-
-                <Card>
+              <Card>
                   <CardHeader>
                     <CardTitle>Study Plans</CardTitle>
                     <CardDescription>Manage your study plans</CardDescription>
@@ -1371,6 +1007,373 @@ const Planner = () => {
                     </div>
                   </CardContent>
                 </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div >
+                      <CardTitle>Task Schedule</CardTitle>
+                      {/* <CardDescription>
+                        {date
+                          ? date.toLocaleDateString("en-US", {
+                              weekday: "long",
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })
+                          : "No date selected"}
+                      </CardDescription> */}
+                    </div>
+                    <Dialog
+                      open={showNewTaskDialog}
+                      onOpenChange={setShowNewTaskDialog}
+                    >
+                      <DialogTrigger asChild>
+                        <Button disabled={!selectedPlanId}>Add Task</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add New Task</DialogTitle>
+                          <DialogDescription>
+                            Create a new task for your study plan
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <Select
+                            value={newTask.plan_id}
+                            onValueChange={(value) =>
+                              setNewTask({ ...newTask, plan_id: value })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select Study Plan" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {studyPlans.map((plan) => (
+                                <SelectItem key={plan.id} value={plan.id}>
+                                  {plan.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            placeholder="Task Title"
+                            value={newTask.title}
+                            onChange={(e) =>
+                              setNewTask({ ...newTask, title: e.target.value })
+                            }
+                          />
+                          <Textarea
+                            placeholder="Task Description"
+                            value={newTask.description}
+                            onChange={(e) =>
+                              setNewTask({
+                                ...newTask,
+                                description: e.target.value,
+                              })
+                            }
+                          />
+                          <Input
+                            type="datetime-local"
+                            value={newTask.due_date}
+                            onChange={(e) =>
+                              setNewTask({
+                                ...newTask,
+                                due_date: e.target.value,
+                              })
+                            }
+                          />
+                          <Select
+                            value={newTask.priority}
+                            onValueChange={(value: "low" | "medium" | "high") =>
+                              setNewTask({ ...newTask, priority: value })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select Priority" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="low">Low</SelectItem>
+                              <SelectItem value="medium">Medium</SelectItem>
+                              <SelectItem value="high">High</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <DialogFooter>
+                          <Button onClick={handleCreateTask}>
+                            Create Task
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </CardHeader>
+                  <CardContent>
+                    <Tabs defaultValue="all">
+                      <TabsList className="mb-4">
+                        <TabsTrigger value="all">All Tasks</TabsTrigger>
+                        <TabsTrigger value="pending">Pending</TabsTrigger>
+                        <TabsTrigger value="completed">Completed</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="all" className="space-y-4 max-h-[500px] overflow-y-auto">
+                        
+                        {tasks.map((task) => {
+                          const dueDate = formatDueDate(task.due_date);
+                          return (
+                            <div
+                              key={task.id}
+                              className="rounded-md border p-4"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <h3 className="font-medium">{task.title}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    {task.description}
+                                  </p>
+                                  <div className="mt-2 flex items-center gap-2">
+                                    {dueDate && (
+                                      <div className="flex flex-col gap-1">
+                                        <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
+                                          {dueDate.date}
+                                        </span>
+                                        <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
+                                          {dueDate.time}
+                                        </span>
+                                      </div>
+                                    )}
+                                    <span
+                                      className={`text-xs py-1 px-2 rounded-full ${
+                                        task.priority === "high"
+                                          ? "bg-red-100 text-red-700"
+                                          : task.priority === "medium"
+                                          ? "bg-amber-100 text-amber-700"
+                                          : "bg-green-100 text-green-700"
+                                      }`}
+                                    >
+                                      {task.priority.charAt(0).toUpperCase() +
+                                        task.priority.slice(1)}{" "}
+                                      Priority
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Select
+                                    value={task.status}
+                                    onValueChange={(
+                                      value:
+                                        | "pending"
+                                        | "in_progress"
+                                        | "completed"
+                                    ) => handleUpdateTaskStatus(task.id, value)}
+                                  >
+                                    <SelectTrigger className="w-[140px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="pending">
+                                        Pending
+                                      </SelectItem>
+                                      <SelectItem value="in_progress">
+                                        In Progress
+                                      </SelectItem>
+                                      <SelectItem value="completed">
+                                        Completed
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                      setTaskToDelete(task.id);
+                                      setShowDeleteTaskDialog(true);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </TabsContent>
+                      <TabsContent value="pending" className="space-y-4 max-h-[500px] overflow-y-auto">
+                        {tasks
+                          .filter((task) => task.status === "pending")
+                          .map((task) => {
+                            const dueDate = formatDueDate(task.due_date);
+                            return (
+                              <div
+                                key={task.id}
+                                className="rounded-md border p-4"
+                              >
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <h3 className="font-medium">
+                                      {task.title}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">
+                                      {task.description}
+                                    </p>
+                                    <div className="mt-2 flex items-center gap-2">
+                                      {dueDate && (
+                                        <div className="flex flex-col gap-1">
+                                          <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
+                                            {dueDate.date}
+                                          </span>
+                                          <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
+                                            {dueDate.time}
+                                          </span>
+                                        </div>
+                                      )}
+                                      <span
+                                        className={`text-xs py-1 px-2 rounded-full ${
+                                          task.priority === "high"
+                                            ? "bg-red-100 text-red-700"
+                                            : task.priority === "medium"
+                                            ? "bg-amber-100 text-amber-700"
+                                            : "bg-green-100 text-green-700"
+                                        }`}
+                                      >
+                                        {task.priority.charAt(0).toUpperCase() +
+                                          task.priority.slice(1)}{" "}
+                                        Priority
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Select
+                                      value={task.status}
+                                      onValueChange={(
+                                        value:
+                                          | "pending"
+                                          | "in_progress"
+                                          | "completed"
+                                      ) =>
+                                        handleUpdateTaskStatus(task.id, value)
+                                      }
+                                    >
+                                      <SelectTrigger className="w-[140px]">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="pending">
+                                          Pending
+                                        </SelectItem>
+                                        <SelectItem value="in_progress">
+                                          In Progress
+                                        </SelectItem>
+                                        <SelectItem value="completed">
+                                          Completed
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        setTaskToDelete(task.id);
+                                        setShowDeleteTaskDialog(true);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </TabsContent>
+                      <TabsContent value="completed" className="space-y-4 max-h-[500px] overflow-y-auto">
+                        {tasks
+                          .filter((task) => task.status === "completed")
+                          .map((task) => {
+                            const dueDate = formatDueDate(task.due_date);
+                            return (
+                              <div
+                                key={task.id}
+                                className="rounded-md border p-4"
+                              >
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <h3 className="font-medium">
+                                      {task.title}
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">
+                                      {task.description}
+                                    </p>
+                                    <div className="mt-2 flex items-center gap-2">
+                                      {dueDate && (
+                                        <div className="flex flex-col gap-1">
+                                          <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
+                                            {dueDate.date}
+                                          </span>
+                                          <span className="bg-blue-100 text-blue-700 text-xs py-1 px-2 rounded-full">
+                                            {dueDate.time}
+                                          </span>
+                                        </div>
+                                      )}
+                                      <span
+                                        className={`text-xs py-1 px-2 rounded-full ${
+                                          task.priority === "high"
+                                            ? "bg-red-100 text-red-700"
+                                            : task.priority === "medium"
+                                            ? "bg-amber-100 text-amber-700"
+                                            : "bg-green-100 text-green-700"
+                                        }`}
+                                      >
+                                        {task.priority.charAt(0).toUpperCase() +
+                                          task.priority.slice(1)}{" "}
+                                        Priority
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Select
+                                      value={task.status}
+                                      onValueChange={(
+                                        value:
+                                          | "pending"
+                                          | "in_progress"
+                                          | "completed"
+                                      ) =>
+                                        handleUpdateTaskStatus(task.id, value)
+                                      }
+                                    >
+                                      <SelectTrigger className="w-[140px]">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="pending">
+                                          Pending
+                                        </SelectItem>
+                                        <SelectItem value="in_progress">
+                                          In Progress
+                                        </SelectItem>
+                                        <SelectItem value="completed">
+                                          Completed
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        setTaskToDelete(task.id);
+                                        setShowDeleteTaskDialog(true);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </TabsContent>
+                    </Tabs>
+                  </CardContent>
+
+                </Card>
+
+                
               </div>
             </div>
           </div>

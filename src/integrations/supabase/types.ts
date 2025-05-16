@@ -399,6 +399,52 @@ export interface Database {
           }
         ];
       };
+      files: {
+        Row: {
+          id: string;
+          name: string;
+          description: string | null;
+          file_path: string;
+          file_type: string;
+          file_size: number;
+          user_id: string;
+          is_public: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          description?: string | null;
+          file_path: string;
+          file_type: string;
+          file_size: number;
+          user_id: string;
+          is_public?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          description?: string | null;
+          file_path?: string;
+          file_type?: string;
+          file_size?: number;
+          user_id?: string;
+          is_public?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "files_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;

@@ -107,4 +107,106 @@ EXECUTE FUNCTION update_modified_column();
 CREATE TRIGGER update_question_answers_timestamp
 BEFORE UPDATE ON public.question_answers
 FOR EACH ROW
-EXECUTE FUNCTION update_modified_column(); 
+EXECUTE FUNCTION update_modified_column();
+
+-- Create files table to store uploaded files
+CREATE TABLE IF NOT EXISTS public.files (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    description TEXT,
+    file_path TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    user_id UUID REFERENCES auth.users(id),
+    is_public BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Add indexes for frequently searched columns
+CREATE INDEX IF NOT EXISTS files_user_id_idx ON public.files (user_id);
+CREATE INDEX IF NOT EXISTS files_file_type_idx ON public.files (file_type);
+CREATE INDEX IF NOT EXISTS files_is_public_idx ON public.files (is_public);
+
+-- Add RLS policies for files
+ALTER TABLE public.files ENABLE ROW LEVEL SECURITY;
+
+-- Users can read public files or their own files
+CREATE POLICY "Users can read public files and their own files" 
+ON public.files FOR SELECT 
+USING (is_public = true OR auth.uid() = user_id);
+
+-- Allow authenticated users to insert files
+CREATE POLICY "Enable insert for authenticated users only" 
+ON public.files FOR INSERT 
+TO authenticated USING (auth.uid() = user_id);
+
+-- Allow users to update their own files
+CREATE POLICY "Users can update their own files" 
+ON public.files FOR UPDATE 
+TO authenticated USING (auth.uid() = user_id);
+
+-- Allow users to delete their own files
+CREATE POLICY "Users can delete their own files" 
+ON public.files FOR DELETE 
+TO authenticated USING (auth.uid() = user_id);
+
+-- Trigger to update the updated_at column for files
+CREATE TRIGGER update_files_timestamp
+BEFORE UPDATE ON public.files
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
+-- Create storage bucket for files
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('files', 'files', false)
+ON CONFLICT (id) DO NOTHING;
+
+-- Set up storage policies for files bucket
+CREATE POLICY "Users can upload their own files"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'files' AND
+  auth.uid() = (storage.foldername(name))[1]::uuid
+);
+
+CREATE POLICY "Users can update their own files"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (
+  bucket_id = 'files' AND
+  auth.uid() = (storage.foldername(name))[1]::uuid
+);
+
+CREATE POLICY "Users can delete their own files"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'files' AND
+  (
+    auth.uid() = (storage.foldername(name))[1]::uuid OR
+    EXISTS (
+      SELECT 1 FROM public.files
+      WHERE files.file_path = storage.objects.name
+      AND files.user_id = auth.uid()
+    )
+  )
+);
+
+CREATE POLICY "Users can view public files"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'files' AND
+  (
+    EXISTS (
+      SELECT 1 FROM public.files
+      WHERE files.file_path = storage.objects.name
+      AND (files.is_public = true OR files.user_id = auth.uid())
+    )
+  )
+);
+
+-- Enable RLS on storage.objects
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY; 
