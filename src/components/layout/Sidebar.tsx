@@ -8,8 +8,10 @@ import {
   Newspaper,
   User,
   FolderOpen,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const sidebarItems = [
   {
@@ -50,77 +52,89 @@ const sidebarItems = [
 ];
 
 const Sidebar = () => {
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    const savedState = localStorage.getItem("sidebarCollapsed");
+    return savedState ? JSON.parse(savedState) : false;
+  });
   const location = useLocation();
 
+  useEffect(() => {
+    localStorage.setItem("sidebarCollapsed", JSON.stringify(isCollapsed));
+  }, [isCollapsed]);
+
   return (
-    <div className="flex h-screen">
-      {/* Toggle button (left side) — only on md and up */}
-      {!isSidebarVisible && (
-        <button
-          className="hidden md:flex items-top p-4"
-          onClick={() => setIsSidebarVisible(true)}
-        >
-          ☰
-        </button>
+    <aside
+      className={cn(
+        "hidden md:flex flex-col border-r bg-sidebar relative transition-all duration-300",
+        isCollapsed ? "w-24" : "w-64"
       )}
+    >
+      {/* Toggle Button */}
+      <button
+        className="absolute -right-3 top-6 bg-sidebar border rounded-full p-1 hover:bg-prepsutra-light/20"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        {isCollapsed ? (
+          <ChevronRight className="h-4 w-4" />
+        ) : (
+          <ChevronLeft className="h-4 w-4" />
+        )}
+      </button>
 
-      {/* Sidebar (md and up only) */}
-      {isSidebarVisible && (
-        <aside className="hidden md:flex flex-col w-64 border-r bg-sidebar p-6 relative transition-all duration-300">
-          {/* Close Button — top-right inside sidebar */}
-          <button
-            className="absolute top-4 right-4 text-xl"
-            onClick={() => setIsSidebarVisible(false)}
-          >
-            ×
-          </button>
+      {/* Brand Section */}
+      <div
+        className={cn(
+          "flex items-center gap-2 p-6",
+          isCollapsed && "justify-center"
+        )}
+      >
+        <img
+          src="icon.png"
+          className="h-6 w-6 text-prepsutra-primary"
+          alt="icon"
+        />
+        {!isCollapsed && (
+          <span className="font-heading text-lg font-bold">PrepSutra</span>
+        )}
+      </div>
 
-          {/* Brand Section */}
-          <div className="flex items-center gap-2 mb-8 mt-2">
-            <img
-              src="icon.png"
-              className="h-6 w-6 text-prepsutra-primary"
-              alt="icon"
-            />
-            <span className="font-heading text-lg font-bold">PrepSutra</span>
+      {/* Navigation */}
+      <nav className="flex flex-col gap-2 px-3">
+        {sidebarItems.map((item) => {
+          const isActive = location.pathname === item.path;
+
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-prepsutra-primary text-white"
+                  : "hover:bg-prepsutra-light/20 hover:text-prepsutra-primary",
+                isCollapsed && "justify-center"
+              )}
+              title={isCollapsed ? item.title : undefined}
+            >
+              <item.icon className="h-4 w-4" />
+              {!isCollapsed && item.title}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Help Box */}
+      {!isCollapsed && (
+        <div className="mt-auto p-4">
+          <div className="rounded-lg border bg-card p-4 shadow-sm">
+            <h5 className="font-semibold mb-2">Need help?</h5>
+            <p className="text-sm text-muted-foreground">
+              Contact our support team for assistance.
+            </p>
           </div>
-
-          {/* Navigation */}
-          <nav className="flex flex-col gap-2">
-            {sidebarItems.map((item) => {
-              const isActive = location.pathname === item.path;
-
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-prepsutra-primary text-white"
-                      : "hover:bg-prepsutra-light/20 hover:text-prepsutra-primary"
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.title}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Help Box */}
-          <div className="mt-auto">
-            <div className="rounded-lg border bg-card p-4 shadow-sm">
-              <h5 className="font-semibold mb-2">Need help?</h5>
-              <p className="text-sm text-muted-foreground">
-                Contact our support team for assistance.
-              </p>
-            </div>
-          </div>
-        </aside>
+        </div>
       )}
-    </div>
+    </aside>
   );
 };
 
