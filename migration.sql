@@ -107,7 +107,7 @@ EXECUTE FUNCTION update_modified_column();
 CREATE TRIGGER update_question_answers_timestamp
 BEFORE UPDATE ON public.question_answers
 FOR EACH ROW
-EXECUTE FUNCTION update_modified_column();
+EXECUTE FUNCTION update_modified_column(); 
 
 -- Create files table to store uploaded files
 CREATE TABLE IF NOT EXISTS public.files (
