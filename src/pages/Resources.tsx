@@ -467,52 +467,61 @@ export default function Resources() {
                   No files uploaded yet
                 </p>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {files?.map((file) => {
                     const FileIcon = getFileIcon(file.file_type);
                     return (
-                      <Card key={file.id}>
-                        <CardHeader>
-                          <CardTitle className="flex items-center">
-                            <FileIcon className="mr-2 h-4 w-4" />
-                            {file.name}
+                      <Card key={file.id} className="flex flex-col h-full">
+                        <CardHeader className="flex-none">
+                          <CardTitle className="flex items-center text-base">
+                            <FileIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{file.name}</span>
                           </CardTitle>
-                          <CardDescription>
+                          <CardDescription className="line-clamp-2">
                             {file.description || "No description"}
                           </CardDescription>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="flex-none">
                           <div className="text-sm text-muted-foreground">
-                            <p>Type: {file.file_type}</p>
+                            <p className="truncate">Type: {file.file_type}</p>
                             <p>Size: {formatFileSize(file.file_size)}</p>
                             <p>Public: {file.is_public ? "Yes" : "No"}</p>
                           </div>
                         </CardContent>
-                        <CardFooter className="flex justify-between">
+                        <CardFooter className="flex flex-col gap-2 mt-auto">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handlePreview(file)}
+                            className="w-full text-xs sm:text-sm"
                           >
-                            <Eye className="mr-2 h-4 w-4" />
-                            Preview
+                            <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+                            <span className="ml-1 sm:ml-2 hidden sm:inline">
+                              Preview
+                            </span>
                           </Button>
-                          <div className="space-x-2">
+                          <div className="flex gap-1 sm:gap-2 w-full">
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => handleDownload(file)}
+                              className="flex-1 text-xs sm:text-sm"
                             >
-                              <Download className="mr-2 h-4 w-4" />
-                              Download
+                              <Download className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="ml-1 sm:ml-2 hidden sm:inline">
+                                Download
+                              </span>
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
                               onClick={() => handleDelete(file)}
+                              className="flex-1 text-xs sm:text-sm"
                             >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="ml-1 sm:ml-2 hidden sm:inline">
+                                Delete
+                              </span>
                             </Button>
                           </div>
                         </CardFooter>
