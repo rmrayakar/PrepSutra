@@ -41,6 +41,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 // Available subject options
 const SUBJECTS = [
@@ -54,6 +57,10 @@ const SUBJECTS = [
   "Ethics",
   "Essay",
   "General Studies",
+  "GS1",
+  "GS2",
+  "GS3",
+  "GS4",
 ];
 
 // Question types
@@ -164,6 +171,32 @@ const Questions = () => {
   );
 
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Add useEffect to check admin status
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", user.id)
+          .single();
+
+        if (error) throw error;
+        setIsAdmin(data?.username === "rmrayakar2004");
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdminStatus();
+  }, [user]);
 
   // Modify useEffect to also fetch saved questions
   useEffect(() => {
@@ -871,182 +904,198 @@ ${
                 </p>
               </div>
 
-              <Dialog open={addQuestionOpen} onOpenChange={setAddQuestionOpen}>
-                <DialogTrigger asChild>
-                  <Button>Add New Question</Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-3xl h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Add New Question</DialogTitle>
-                    <DialogDescription>
-                      Enter the details of the previous year question
-                    </DialogDescription>
-                  </DialogHeader>
+              <div className="flex gap-2">
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate("/questions/upload")}
+                  >
+                    Upload Questions
+                  </Button>
+                )}
+                <Dialog
+                  open={addQuestionOpen}
+                  onOpenChange={setAddQuestionOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button>Add New Question</Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Add New Question</DialogTitle>
+                      <DialogDescription>
+                        Enter the details of the previous year question
+                      </DialogDescription>
+                    </DialogHeader>
 
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col">
-                        <Label htmlFor="exam-type">Exam Type</Label>
-                        <br />
-                        <Select
-                          value={newQuestion.exam_type}
-                          onValueChange={(value) =>
-                            setNewQuestion({ ...newQuestion, exam_type: value })
-                          }
-                        >
-                          <SelectTrigger id="exam-type">
-                            <SelectValue placeholder="Select exam type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Prelims">Prelims</SelectItem>
-                            <SelectItem value="Mains">Mains</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col">
+                          <Label htmlFor="exam-type">Exam Type</Label>
+                          <br />
+                          <Select
+                            value={newQuestion.exam_type}
+                            onValueChange={(value) =>
+                              setNewQuestion({
+                                ...newQuestion,
+                                exam_type: value,
+                              })
+                            }
+                          >
+                            <SelectTrigger id="exam-type">
+                              <SelectValue placeholder="Select exam type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Prelims">Prelims</SelectItem>
+                              <SelectItem value="Mains">Mains</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex flex-col">
+                          <Label htmlFor="year">Year</Label>
+                          <br />
+                          <Input
+                            id="year"
+                            type="number"
+                            value={newQuestion.year}
+                            onChange={(e) =>
+                              setNewQuestion({
+                                ...newQuestion,
+                                year: parseInt(e.target.value),
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col">
+                          <Label htmlFor="subject">Subject</Label>
+                          <br />
+                          <Select
+                            value={newQuestion.subject}
+                            onValueChange={(value) =>
+                              setNewQuestion({ ...newQuestion, subject: value })
+                            }
+                          >
+                            <SelectTrigger id="subject">
+                              <SelectValue placeholder="Select subject" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {subjects.map((subj) => (
+                                <SelectItem key={subj} value={subj}>
+                                  {subj}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="flex flex-col">
+                          <Label htmlFor="question-type">Question Type</Label>
+                          <br />
+                          <Select
+                            value={newQuestion.question_type}
+                            onValueChange={(value) =>
+                              setNewQuestion({
+                                ...newQuestion,
+                                question_type: value,
+                              })
+                            }
+                          >
+                            <SelectTrigger id="question-type">
+                              <SelectValue placeholder="Select question type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {QUESTION_TYPES.map((type) => (
+                                <SelectItem key={type.value} value={type.value}>
+                                  {type.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col">
+                          <Label htmlFor="keywords">
+                            Keywords (comma-separated)
+                          </Label>
+                          <br />
+                          <Input
+                            id="keywords"
+                            value={keywordsInput}
+                            onChange={handleKeywordChange}
+                            placeholder="e.g. Constitution, Environment, Economy"
+                          />
+                        </div>
+
+                        <div className="flex flex-col">
+                          <Label htmlFor="marks">Marks</Label>
+                          <br />
+                          <Input
+                            id="marks"
+                            type="number"
+                            min="1"
+                            value={newQuestion.marks}
+                            onChange={(e) =>
+                              setNewQuestion({
+                                ...newQuestion,
+                                marks: parseInt(e.target.value) || 1,
+                              })
+                            }
+                          />
+                        </div>
                       </div>
 
                       <div className="flex flex-col">
-                        <Label htmlFor="year">Year</Label>
+                        <Label htmlFor="question-text">Question Content</Label>
                         <br />
-                        <Input
-                          id="year"
-                          type="number"
-                          value={newQuestion.year}
+                        <Textarea
+                          id="question-text"
+                          rows={5}
+                          value={newQuestion.question_text}
                           onChange={(e) =>
                             setNewQuestion({
                               ...newQuestion,
-                              year: parseInt(e.target.value),
+                              question_text: e.target.value,
                             })
                           }
                         />
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col">
-                        <Label htmlFor="subject">Subject</Label>
-                        <br />
-                        <Select
-                          value={newQuestion.subject}
-                          onValueChange={(value) =>
-                            setNewQuestion({ ...newQuestion, subject: value })
-                          }
-                        >
-                          <SelectTrigger id="subject">
-                            <SelectValue placeholder="Select subject" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {subjects.map((subj) => (
-                              <SelectItem key={subj} value={subj}>
-                                {subj}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {renderQuestionOptions()}
 
                       <div className="flex flex-col">
-                        <Label htmlFor="question-type">Question Type</Label>
-                        <br />
-                        <Select
-                          value={newQuestion.question_type}
-                          onValueChange={(value) =>
-                            setNewQuestion({
-                              ...newQuestion,
-                              question_type: value,
-                            })
-                          }
-                        >
-                          <SelectTrigger id="question-type">
-                            <SelectValue placeholder="Select question type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {QUESTION_TYPES.map((type) => (
-                              <SelectItem key={type.value} value={type.value}>
-                                {type.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col">
-                        <Label htmlFor="keywords">
-                          Keywords (comma-separated)
+                        <Label htmlFor="explanation">
+                          Explanation (Optional)
                         </Label>
                         <br />
-                        <Input
-                          id="keywords"
-                          value={keywordsInput}
-                          onChange={handleKeywordChange}
-                          placeholder="e.g. Constitution, Environment, Economy"
-                        />
-                      </div>
-
-                      <div className="flex flex-col">
-                        <Label htmlFor="marks">Marks</Label>
-                        <br />
-                        <Input
-                          id="marks"
-                          type="number"
-                          min="1"
-                          value={newQuestion.marks}
+                        <Textarea
+                          id="explanation"
+                          rows={3}
+                          value={newQuestion.explanation || ""}
                           onChange={(e) =>
                             setNewQuestion({
                               ...newQuestion,
-                              marks: parseInt(e.target.value) || 1,
+                              explanation: e.target.value,
                             })
                           }
                         />
                       </div>
                     </div>
 
-                    <div className="flex flex-col">
-                      <Label htmlFor="question-text">Question Content</Label>
-                      <br />
-                      <Textarea
-                        id="question-text"
-                        rows={5}
-                        value={newQuestion.question_text}
-                        onChange={(e) =>
-                          setNewQuestion({
-                            ...newQuestion,
-                            question_text: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-
-                    {renderQuestionOptions()}
-
-                    <div className="flex flex-col">
-                      <Label htmlFor="explanation">
-                        Explanation (Optional)
-                      </Label>
-                      <br />
-                      <Textarea
-                        id="explanation"
-                        rows={3}
-                        value={newQuestion.explanation || ""}
-                        onChange={(e) =>
-                          setNewQuestion({
-                            ...newQuestion,
-                            explanation: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <DialogFooter>
-                    <DialogClose asChild>
-                      <Button variant="outline">Cancel</Button>
-                    </DialogClose>
-                    <Button onClick={handleAddQuestion}>Add Question</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button variant="outline">Cancel</Button>
+                      </DialogClose>
+                      <Button onClick={handleAddQuestion}>Add Question</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
 
             {/* Questions View Toggle */}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -91,6 +91,29 @@ export default function Resources() {
   const [isPublic, setIsPublic] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileRecord | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      checkAdminStatus();
+    }
+  }, [user]);
+
+  const checkAdminStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user?.id)
+        .single();
+
+      if (error) throw error;
+      setIsAdmin(data?.username === "rmrayakar2004");
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+      setIsAdmin(false);
+    }
+  };
 
   const { data: files, isLoading } = useQuery<FileRecord[]>({
     queryKey: ["files"],
@@ -167,7 +190,7 @@ export default function Resources() {
 
         if (dbError) {
           console.error("Database deletion error:", dbError);
-          throw new Error("Failed to delete file from database");
+          throw new Error("Only the admin can delete this file");
         }
 
         // Then delete from storage
@@ -423,15 +446,17 @@ export default function Resources() {
                       disabled={isUploading}
                     />
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="public"
-                      checked={isPublic}
-                      onCheckedChange={setIsPublic}
-                      disabled={isUploading}
-                    />
-                    <Label htmlFor="public">Make this file public</Label>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="public"
+                        checked={isPublic}
+                        onCheckedChange={setIsPublic}
+                        disabled={isUploading}
+                      />
+                      <Label htmlFor="public">Make this file public</Label>
+                    </div>
+                  )}
                 </div>
               </CardContent>
               <CardFooter>

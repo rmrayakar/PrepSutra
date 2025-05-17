@@ -305,7 +305,18 @@ export const searchExamQuestions = async (
 
   const { data, error, count } = await query;
 
-  if (error) throw error;
+  if (error) {
+    console.error("Error searching questions:", error);
+    throw error;
+  }
+
+  console.log("Search results:", {
+    totalCount: count,
+    questionsFound: data?.length || 0,
+    params,
+    isUserLoggedIn: !!user,
+  });
+
   return {
     questions: data || [],
     count: count || 0,

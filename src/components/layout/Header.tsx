@@ -153,8 +153,12 @@ const Header = () => {
       <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center">
           <div className="mr-4 flex">
-            <Link to="/" className="flex items-center space-x-2">
-              <img src="icon.png" className="h-6 w-6 text-prepsutra-primary" />
+            <Link to="/" className="flex items-start space-x-2">
+              <img
+                src="/icon.png"
+                alt="PrepSutra Logo"
+                className="h-6 w-6 text-prepsutra-primary"
+              />
               <span className="font-heading text-xl font-bold">PrepSutra</span>
             </Link>
           </div>

@@ -87,16 +87,7 @@ const Sidebar = () => {
           "flex items-center gap-2 p-6",
           isCollapsed && "justify-center"
         )}
-      >
-        <img
-          src="icon.png"
-          className="h-6 w-6 text-prepsutra-primary"
-          alt="icon"
-        />
-        {!isCollapsed && (
-          <span className="font-heading text-lg font-bold">PrepSutra</span>
-        )}
-      </div>
+      ></div>
 
       {/* Navigation */}
       <nav className="flex flex-col gap-2 px-3">
