@@ -111,7 +111,7 @@ serve(async (req) => {
 
     // Initialize Gemini
     const genAI = new GoogleGenerativeAI(geminiApiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Generate content
     const result = await model.generateContent(prompt);

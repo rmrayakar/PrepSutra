@@ -629,3 +629,118 @@ export const deleteEssay = async (id: string) => {
   if (error) throw error;
   return true;
 };
+
+// News Article Types
+export interface NewsArticle {
+  id: string;
+  title: string;
+  content: string;
+  summary: string;
+  author: string;
+  source: string;
+  url: string;
+  published_date: string;
+  category: string;
+  tags: string[];
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// News Article Functions
+export const saveArticle = async (
+  article: Omit<NewsArticle, "id" | "created_at" | "updated_at">
+) => {
+  try {
+    const { data, error } = await supabase
+      .from("news_articles")
+      .insert([article])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error("Error saving article:", error);
+    throw error;
+  }
+};
+
+export const getArticles = async (params: {
+  category?: string;
+  tags?: string[];
+  search?: string;
+  limit?: number;
+  offset?: number;
+  user_id?: string;
+}) => {
+  try {
+    let query = supabase.from("news_articles").select("*", { count: "exact" });
+
+    if (params.category) {
+      query = query.eq("category", params.category);
+    }
+
+    if (params.tags && params.tags.length > 0) {
+      query = query.contains("tags", params.tags);
+    }
+
+    if (params.search) {
+      query = query.or(
+        `title.ilike.%${params.search}%,content.ilike.%${params.search}%`
+      );
+    }
+
+    if (params.user_id) {
+      query = query.eq("user_id", params.user_id);
+    }
+
+    if (params.limit) {
+      query = query.limit(params.limit);
+    }
+
+    if (params.offset) {
+      query = query.range(
+        params.offset,
+        params.offset + (params.limit || 10) - 1
+      );
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+    return { articles: data, count };
+  } catch (error) {
+    console.error("Error fetching articles:", error);
+    throw error;
+  }
+};
+
+export const getArticleCategories = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("news_articles")
+      .select("category", { distinct: true });
+
+    if (error) throw error;
+    return data.map((item) => item.category);
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    throw error;
+  }
+};
+
+export const deleteArticle = async (articleId: string) => {
+  try {
+    const { error } = await supabase
+      .from("news_articles")
+      .delete()
+      .eq("id", articleId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error("Error deleting article:", error);
+    throw error;
+  }
+};

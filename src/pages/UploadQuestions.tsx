@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Papa from "papaparse";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,27 @@ interface CSVQuestion {
   marks: number;
 }
 
+const validSubjects = [
+  "History",
+  "Geography",
+  "Polity",
+  "Economy",
+  "Environment",
+  "Science & Tech",
+  "International Relations",
+  "Ethics",
+  "Essay",
+  "General Studies",
+  "GS1",
+  "GS2",
+  "GS3",
+  "GS4",
+];
+
+const validateSubject = (subject: string): boolean => {
+  return validSubjects.includes(subject);
+};
+
 const UploadQuestions = () => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -38,29 +60,6 @@ const UploadQuestions = () => {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Define valid subjects at component level
-  const validSubjects = [
-    "History",
-    "Geography",
-    "Polity",
-    "Economy",
-    "Environment",
-    "Science & Tech",
-    "International Relations",
-    "Ethics",
-    "Essay",
-    "General Studies",
-    "GS1",
-    "GS2",
-    "GS3",
-    "GS4",
-  ];
-
-  // Add validation for GS paper categories
-  const validateSubject = (subject: string): boolean => {
-    return validSubjects.includes(subject);
-  };
-
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!user) {
@@ -68,32 +67,17 @@ const UploadQuestions = () => {
         return;
       }
 
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("username")
-          .eq("id", user.id)
-          .single();
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .single();
 
-        if (error) throw error;
-
-        // Check if data exists and has username property
-        if (!data || typeof data !== "object") {
-          throw new Error("Profile data not found");
-        }
-
-        const username = (data as any).username;
-        if (typeof username !== "string" || username !== "rmrayakar2004") {
-          toast.error("Only admins can access this page");
-          navigate("/questions");
-          return;
-        }
-
-        setIsAdmin(true);
-      } catch (error) {
-        console.error("Error checking admin status:", error);
-        toast.error("Error verifying admin status");
+      if (error || !data || data.username !== "rmrayakar2004") {
+        toast.error("Only admins can access this page");
         navigate("/questions");
+      } else {
+        setIsAdmin(true);
       }
     };
 
@@ -111,60 +95,53 @@ const UploadQuestions = () => {
 
   const parseCSV = async (file: File): Promise<CSVQuestion[]> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const text = e.target?.result as string;
-          const lines = text.split("\n");
-          const headers = lines[0].split(",").map((h) => h.trim());
-
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
           const questions: CSVQuestion[] = [];
-          for (let i = 1; i < lines.length; i++) {
-            if (!lines[i].trim()) continue;
 
-            const values = lines[i].split(",").map((v) => v.trim());
-            const subject =
-              values[headers.indexOf("subject")] || "General Studies";
+          try {
+            for (let i = 0; i < results.data.length; i++) {
+              const row: any = results.data[i];
+              const subject = row.subject?.trim() || "General Studies";
 
-            // Validate subject
-            if (!validateSubject(subject)) {
-              throw new Error(
-                `Invalid subject "${subject}" in line ${
-                  i + 1
-                }. Valid subjects are: ${validSubjects.join(", ")}`
-              );
+              if (!validateSubject(subject)) {
+                throw new Error(
+                  `Invalid subject "${subject}" in row ${
+                    i + 2
+                  }. Valid subjects: ${validSubjects.join(", ")}`
+                );
+              }
+
+              const year = parseInt(row.year);
+              const marks = parseInt(row.marks);
+
+              questions.push({
+                question_text: row.question_text?.trim() || "",
+                year: isNaN(year) ? new Date().getFullYear() : year,
+                subject,
+                exam_type: row.exam_type?.trim() || "Prelims",
+                keywords: (row.keywords || "")
+                  .split(";")
+                  .map((k: string) => k.trim())
+                  .filter(Boolean),
+                options: row.options
+                  ? row.options.split(";").map((o: string) => o.trim())
+                  : undefined,
+                correct_answer: row.correct_answer?.trim() || undefined,
+                explanation: row.explanation?.trim() || undefined,
+                question_type: row.question_type?.trim() || "mcq",
+                marks: isNaN(marks) ? 1 : marks,
+              });
             }
-
-            const question: CSVQuestion = {
-              question_text: values[headers.indexOf("question_text")] || "",
-              year:
-                parseInt(values[headers.indexOf("year")]) ||
-                new Date().getFullYear(),
-              subject: subject,
-              exam_type: values[headers.indexOf("exam_type")] || "Prelims",
-              keywords: (values[headers.indexOf("keywords")] || "")
-                .split(";")
-                .map((k) => k.trim()),
-              options: values[headers.indexOf("options")]
-                ? values[headers.indexOf("options")]
-                    .split(";")
-                    .map((o) => o.trim())
-                : undefined,
-              correct_answer:
-                values[headers.indexOf("correct_answer")] || undefined,
-              explanation: values[headers.indexOf("explanation")] || undefined,
-              question_type: values[headers.indexOf("question_type")] || "mcq",
-              marks: parseInt(values[headers.indexOf("marks")]) || 1,
-            };
-            questions.push(question);
+            resolve(questions);
+          } catch (error) {
+            reject(error);
           }
-          resolve(questions);
-        } catch (error) {
-          reject(error);
-        }
-      };
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsText(file);
+        },
+        error: (error) => reject(error),
+      });
     });
   };
 
@@ -179,31 +156,27 @@ const UploadQuestions = () => {
       setProgress(0);
 
       const questions = await parseCSV(file);
-      const totalQuestions = questions.length;
-      let uploadedCount = 0;
+      const total = questions.length;
 
-      for (const question of questions) {
-        const { error } = await supabase.from("exam_questions").insert([
-          {
-            ...question,
-            is_database_question: true,
-            user_id: user?.id,
-          },
-        ]);
+      const payload = questions.map((q) => ({
+        ...q,
+        is_database_question: true,
+        user_id: user?.id,
+      }));
 
-        if (error) {
-          console.error("Error uploading question:", error);
-          throw error;
-        }
+      const batchSize = 100;
+      for (let i = 0; i < payload.length; i += batchSize) {
+        const batch = payload.slice(i, i + batchSize);
+        const { error } = await supabase.from("exam_questions").insert(batch);
 
-        uploadedCount++;
-        setProgress((uploadedCount / totalQuestions) * 100);
+        if (error) throw error;
+        setProgress(((i + batch.length) / total) * 100);
       }
 
-      toast.success(`Successfully uploaded ${totalQuestions} questions`);
+      toast.success(`Successfully uploaded ${total} questions`);
       navigate("/questions");
     } catch (error: any) {
-      console.error("Error uploading questions:", error);
+      console.error("Upload error:", error);
       toast.error(error.message || "Failed to upload questions");
     } finally {
       setUploading(false);
@@ -234,10 +207,20 @@ const UploadQuestions = () => {
             <CardHeader>
               <CardTitle>Upload Questions</CardTitle>
               <CardDescription>
-                Upload a CSV file containing multiple questions. The CSV should
-                have the following columns: question_text, year, subject,
-                exam_type, keywords, options (optional), correct_answer
-                (optional), explanation (optional), question_type, marks
+                Upload a CSV file with the following columns: <br />
+                <strong>
+                  question_text, year, subject, exam_type, keywords, options
+                  (optional), correct_answer (optional), explanation (optional),
+                  question_type, marks
+                </strong>
+                <br />
+                <a
+                  href="/sample_questions.csv"
+                  download
+                  className="text-blue-600 hover:underline text-sm"
+                >
+                  📥 Download Sample CSV Template
+                </a>
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -44,6 +44,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 
 // Available subject options
 const SUBJECTS = [
@@ -116,6 +130,17 @@ interface QuestionAnswer {
   updated_at: string;
 }
 
+// Add new interfaces for analysis data
+interface TopicAnalysis {
+  topics: { name: string; count: number }[];
+  subjectDistribution: { subject: string; count: number }[];
+}
+
+interface QuestionPattern {
+  questionTypes: { type: string; count: number }[];
+  yearTrend: { year: number; count: number }[];
+}
+
 const Questions = () => {
   // State for filtering and searching
   const [examType, setExamType] = useState<string>("Prelims");
@@ -170,6 +195,17 @@ const Questions = () => {
     new Set()
   );
 
+  // Add new state for analysis data
+  const [topicAnalysis, setTopicAnalysis] = useState<TopicAnalysis>({
+    topics: [],
+    subjectDistribution: [],
+  });
+  const [questionPattern, setQuestionPattern] = useState<QuestionPattern>({
+    questionTypes: [],
+    yearTrend: [],
+  });
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -212,6 +248,13 @@ const Questions = () => {
     questionsView,
     questionType,
   ]);
+
+  // Add new useEffect for analysis
+  useEffect(() => {
+    if (questions.length > 0) {
+      analyzeQuestions();
+    }
+  }, [questions]);
 
   const fetchSubjects = async () => {
     try {
@@ -886,6 +929,75 @@ ${
     return null;
   };
 
+  // Add new function to analyze questions
+  const analyzeQuestions = () => {
+    if (!questions.length) return;
+
+    setAnalysisLoading(true);
+    try {
+      // Analyze topics and keywords
+      const topicCounts = new Map<string, number>();
+      const subjectCounts = new Map<string, number>();
+      const questionTypeCounts = new Map<string, number>();
+      const yearCounts = new Map<number, number>();
+
+      questions.forEach((question) => {
+        // Count topics/keywords
+        question.keywords.forEach((keyword) => {
+          topicCounts.set(keyword, (topicCounts.get(keyword) || 0) + 1);
+        });
+
+        // Count subjects
+        subjectCounts.set(
+          question.subject,
+          (subjectCounts.get(question.subject) || 0) + 1
+        );
+
+        // Count question types
+        questionTypeCounts.set(
+          question.question_type,
+          (questionTypeCounts.get(question.question_type) || 0) + 1
+        );
+
+        // Count by year
+        yearCounts.set(question.year, (yearCounts.get(question.year) || 0) + 1);
+      });
+
+      // Convert maps to arrays and sort by count
+      const topics = Array.from(topicCounts.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10); // Top 10 topics
+
+      const subjectDistribution = Array.from(subjectCounts.entries())
+        .map(([subject, count]) => ({ subject, count }))
+        .sort((a, b) => b.count - a.count);
+
+      const questionTypes = Array.from(questionTypeCounts.entries())
+        .map(([type, count]) => ({
+          type: QUESTION_TYPES.find((t) => t.value === type)?.label || type,
+          count,
+        }))
+        .sort((a, b) => b.count - a.count);
+
+      const yearTrend = Array.from(yearCounts.entries())
+        .map(([year, count]) => ({ year, count }))
+        .sort((a, b) => a.year - b.year);
+
+      setTopicAnalysis({ topics, subjectDistribution });
+      setQuestionPattern({ questionTypes, yearTrend });
+    } catch (error) {
+      console.error("Error analyzing questions:", error);
+      toast({
+        title: "Error",
+        description: "Failed to analyze questions. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -1284,7 +1396,10 @@ ${
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="prelims" className="space-y-4">
+                  <TabsContent
+                    value="prelims"
+                    className="space-y-4 max-h-[700px] overflow-y-auto"
+                  >
                     {loading ? (
                       <div className="flex justify-center p-8">
                         <p>Loading questions...</p>
@@ -1366,7 +1481,10 @@ ${
                     )}
                   </TabsContent>
 
-                  <TabsContent value="mains" className="space-y-4">
+                  <TabsContent
+                    value="mains"
+                    className="space-y-4 max-h-[700px] overflow-y-auto"
+                  >
                     {loading ? (
                       <div className="flex justify-center p-8">
                         <p>Loading questions...</p>
@@ -1451,7 +1569,7 @@ ${
               </CardContent>
             </Card>
 
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-2 ">
               <Card>
                 <CardHeader>
                   <CardTitle>Topic Analysis</CardTitle>
@@ -1459,12 +1577,126 @@ ${
                     Recurring themes in previous years
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="h-[200px] flex items-center justify-center bg-muted/30 rounded-md">
-                    <p className="text-muted-foreground">
-                      Topic analysis charts will appear here
-                    </p>
-                  </div>
+                <CardContent className="max-h-[400px] overflow-y-auto">
+                  {analysisLoading ? (
+                    <div className="h-[300px] flex items-center justify-center">
+                      <p className="text-muted-foreground">
+                        Analyzing topics...
+                      </p>
+                    </div>
+                  ) : topicAnalysis.topics.length === 0 ? (
+                    <div className="h-[300px] flex items-center justify-center">
+                      <p className="text-muted-foreground">
+                        No topics to analyze. Try adjusting your filters.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Top Topics</h4>
+                        <div className="h-[300px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={topicAnalysis.topics}
+                              margin={{
+                                top: 10,
+                                right: 30,
+                                left: 40,
+                                bottom: 20,
+                              }}
+                              barSize={30}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" hide={true} />
+                              <YAxis
+                                tick={{ fontSize: 11 }}
+                                label={{
+                                  value: "Count",
+                                  angle: -90,
+                                  position: "insideLeft",
+                                  style: { fontSize: 11 },
+                                }}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    return (
+                                      <div className="bg-white p-3 border rounded shadow">
+                                        <p className="font-medium text-base mb-1">
+                                          {payload[0].payload.name}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                          Questions: {payload[0].value}
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Bar
+                                dataKey="count"
+                                fill="#8884d8"
+                                radius={[4, 4, 0, 0]}
+                              />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">
+                          Subject Distribution
+                        </h4>
+                        <div className="h-[350px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={topicAnalysis.subjectDistribution}
+                                dataKey="count"
+                                nameKey="subject"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={({ subject, percent }) =>
+                                  percent > 0.05
+                                    ? `${subject} (${(percent * 100).toFixed(
+                                        0
+                                      )}%)`
+                                    : ""
+                                }
+                              >
+                                {topicAnalysis.subjectDistribution.map(
+                                  (entry, index) => (
+                                    <Cell
+                                      key={`cell-${index}`}
+                                      fill={`hsl(${index * 45}, 70%, 50%)`}
+                                    />
+                                  )
+                                )}
+                              </Pie>
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    return (
+                                      <div className="bg-white p-2 border rounded shadow">
+                                        <p className="font-medium">
+                                          {payload[0].name}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                          Questions: {payload[0].value}
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1475,12 +1707,142 @@ ${
                     How question styles have evolved
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="h-[200px] flex items-center justify-center bg-muted/30 rounded-md">
-                    <p className="text-muted-foreground">
-                      Pattern analysis will appear here
-                    </p>
-                  </div>
+                <CardContent className="max-h-[400px] overflow-y-auto">
+                  {analysisLoading ? (
+                    <div className="h-[300px] flex items-center justify-center">
+                      <p className="text-muted-foreground">
+                        Analyzing patterns...
+                      </p>
+                    </div>
+                  ) : questionPattern.questionTypes.length === 0 ? (
+                    <div className="h-[300px] flex items-center justify-center">
+                      <p className="text-muted-foreground">
+                        No patterns to analyze. Try adjusting your filters.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">
+                          Year-wise Trend
+                        </h4>
+                        <div className="h-[350px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={questionPattern.yearTrend}
+                              margin={{
+                                top: 10,
+                                right: 30,
+                                left: 40,
+                                bottom: 20,
+                              }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="year"
+                                tick={{ fontSize: 11 }}
+                                label={{
+                                  value: "Year",
+                                  position: "insideBottom",
+                                  offset: -5,
+                                  style: { fontSize: 11 },
+                                }}
+                              />
+                              <YAxis
+                                tick={{ fontSize: 11 }}
+                                label={{
+                                  value: "Number of Questions",
+                                  angle: -90,
+                                  position: "insideLeft",
+                                  style: { fontSize: 11 },
+                                }}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    return (
+                                      <div className="bg-white p-2 border rounded shadow">
+                                        <p className="font-medium">
+                                          Year: {payload[0].payload.year}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                          Questions: {payload[0].value}
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="count"
+                                stroke="#8884d8"
+                                activeDot={{ r: 8 }}
+                                strokeWidth={2}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">
+                          Question Type Distribution
+                        </h4>
+                        <div className="h-[350px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={questionPattern.questionTypes}
+                              margin={{
+                                top: 10,
+                                right: 30,
+                                left: 40,
+                                bottom: 60,
+                              }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="type"
+                                angle={-45}
+                                textAnchor="end"
+                                height={80}
+                                interval={0}
+                                tick={{ fontSize: 11 }}
+                                tickMargin={10}
+                              />
+                              <YAxis
+                                tick={{ fontSize: 11 }}
+                                label={{
+                                  value: "Count",
+                                  angle: -90,
+                                  position: "insideLeft",
+                                  style: { fontSize: 11 },
+                                }}
+                              />
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    return (
+                                      <div className="bg-white p-2 border rounded shadow">
+                                        <p className="font-medium">
+                                          {payload[0].payload.type}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground">
+                                          Count: {payload[0].value}
+                                        </p>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Bar dataKey="count" fill="#82ca9d" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
