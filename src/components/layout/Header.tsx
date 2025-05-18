@@ -151,9 +151,9 @@ const Header = () => {
   return (
     <>
       <header className="sticky top-0 z-30 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center">
-          <div className="mr-4 flex">
-            <Link to="/" className="flex items-start space-x-2">
+        <div className="flex h-16 items-center px-6 lg:px-8">
+          <div className="flex items-center">
+            <Link to="/" className="flex items-center space-x-2">
               <img
                 src="/icon.png"
                 alt="PrepSutra Logo"
@@ -164,28 +164,28 @@ const Header = () => {
           </div>
 
           <div className="flex-1">
-            <nav className="hidden md:flex gap-6 ml-6">
+            <nav className="hidden md:flex gap-6 ml-12">
               <Link
                 to="/planner"
-                className="text-sm font-medium transition-colors hover:text-prepsutra-primary"
+                className="text-sm font-medium transition-all duration-200 hover:text-prepsutra-primary relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-prepsutra-primary after:transition-all after:duration-200 hover:after:w-full"
               >
                 Study Planner
               </Link>
               <Link
                 to="/news"
-                className="text-sm font-medium transition-colors hover:text-prepsutra-primary"
+                className="text-sm font-medium transition-all duration-200 hover:text-prepsutra-primary relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-prepsutra-primary after:transition-all after:duration-200 hover:after:w-full"
               >
                 News Summarizer
               </Link>
               <Link
                 to="/questions"
-                className="text-sm font-medium transition-colors hover:text-prepsutra-primary"
+                className="text-sm font-medium transition-all duration-200 hover:text-prepsutra-primary relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-prepsutra-primary after:transition-all after:duration-200 hover:after:w-full"
               >
                 PYQ Analyzer
               </Link>
               <Link
                 to="/essay"
-                className="text-sm font-medium transition-colors hover:text-prepsutra-primary"
+                className="text-sm font-medium transition-all duration-200 hover:text-prepsutra-primary relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-prepsutra-primary after:transition-all after:duration-200 hover:after:w-full"
               >
                 Essay Builder
               </Link>

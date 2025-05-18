@@ -21,6 +21,7 @@ import {
   getEssayById,
   updateEssay,
   deleteEssay,
+  humanizeText,
 } from "@/integrations/supabase/functions";
 import { useToast } from "@/hooks/use-toast";
 import type { EssayFeedbackResponse } from "@/integrations/supabase/functions";
@@ -51,6 +52,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
+import { Wand2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 const ESSAY_TYPES = [
   { value: "general", label: "General Essay" },
@@ -83,6 +86,7 @@ const Essay = () => {
   const [framework, setFramework] = useState<EssayFramework | null>(null);
   const [generatingComplete, setGeneratingComplete] = useState(false);
   const { toast } = useToast();
+  const [isHumanizing, setIsHumanizing] = useState(false);
 
   useEffect(() => {
     loadSavedEssays();
@@ -118,17 +122,25 @@ const Essay = () => {
       // Prepare feedback data
       const feedbackData = feedback ? JSON.stringify(feedback) : null;
 
+      // Format content if it's not already formatted
+      const formattedContent = content.includes("Examples:")
+        ? content
+        : content
+            .split("\n")
+            .map((paragraph) => paragraph.trim())
+            .join("\n\n");
+
       if (currentEssayId) {
         savedEssay = await updateEssay(currentEssayId, {
           title,
-          content,
+          content: formattedContent,
           feedback: feedbackData,
           score: feedback?.overallScore || null,
         });
       } else {
         savedEssay = await saveEssay(
           title,
-          content,
+          formattedContent,
           feedbackData,
           feedback?.overallScore || null
         );
@@ -233,9 +245,18 @@ const Essay = () => {
 
     try {
       setLoading(true);
-      const response = await getEssayFeedback(title, content);
+      // Format content if it's not already formatted
+      const formattedContent = content.includes("Examples:")
+        ? content
+        : content
+            .split("\n")
+            .map((paragraph) => paragraph.trim())
+            .join("\n\n");
+
+      const response = await getEssayFeedback(title, formattedContent);
       setFeedback(response);
     } catch (error) {
+      console.error("Error getting feedback:", error);
       toast({
         title: "Error",
         description: "Failed to get essay feedback. Please try again.",
@@ -354,6 +375,46 @@ const Essay = () => {
       });
     } finally {
       setGeneratingComplete(false);
+    }
+  };
+
+  const handleHumanize = async (content: string) => {
+    if (!content) {
+      toast({
+        title: "Error",
+        description: "Please enter some text to humanize",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsHumanizing(true);
+      const humanizedText = await humanizeText(content);
+
+      // Only update if we got a different text back
+      if (humanizedText && humanizedText !== content) {
+        setContent(humanizedText);
+        toast({
+          title: "Success",
+          description: "Text has been humanized successfully",
+        });
+      } else {
+        toast({
+          title: "Info",
+          description: "The text was already in a natural form",
+        });
+      }
+    } catch (error) {
+      console.error("Error humanizing text:", error);
+      toast({
+        title: "Error",
+        description:
+          error.message || "Failed to humanize text. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsHumanizing(false);
     }
   };
 
@@ -520,6 +581,7 @@ const Essay = () => {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleLoadEssay(essay.id)}
+                                    className="transition-all duration-200 hover:bg-prepsutra-primary hover:text-white hover:scale-105"
                                   >
                                     Load
                                   </Button>
@@ -527,6 +589,7 @@ const Essay = () => {
                                     variant="destructive"
                                     size="sm"
                                     onClick={() => handleDeleteEssay(essay.id)}
+                                    className="transition-all duration-200 hover:bg-red-600 hover:scale-105"
                                   >
                                     Delete
                                   </Button>
@@ -626,30 +689,62 @@ const Essay = () => {
                       placeholder="Enter your essay title"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="content">Essay Content</Label>
-                    <div className="relative">
-                      <Textarea
-                        id="content"
-                        value={content}
-                        onChange={(e) => setContent(e.target.value)}
-                        placeholder="Write your essay here..."
-                        className="min-h-[400px]"
-                      />
-                      <br />
-                      <br />
-                      <div
-                        className={`absolute bottom-2 right-2 text-sm ${
-                          isOverWordLimit
-                            ? "text-red-500"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {wordCount}/{WORD_LIMIT} words
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium">Content</h3>
+                      <div className="flex gap-2">
+                        <div className="text-sm text-muted-foreground">
+                          {wordCount}/{WORD_LIMIT} words
+                          {isOverWordLimit && (
+                            <span className="text-red-500 ml-2">
+                              (Over limit)
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <Tabs defaultValue="write" className="w-full">
+                      <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="write">Write</TabsTrigger>
+                        <TabsTrigger value="preview">Preview</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="write" className="mt-4">
+                        <Textarea
+                          value={content}
+                          onChange={(e) => setContent(e.target.value)}
+                          placeholder="Start writing your essay here..."
+                          className="min-h-[400px] font-mono"
+                        />
+                      </TabsContent>
+                      <TabsContent value="preview" className="mt-4">
+                        <div className="prose max-w-none min-h-[400px] p-4 border rounded-md">
+                          {content.split("\n").map((paragraph, index) => (
+                            <p key={index} className="mb-4">
+                              {paragraph}
+                            </p>
+                          ))}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   </div>
                   <div className="flex justify-end gap-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => handleHumanize(content)}
+                      disabled={isHumanizing}
+                    >
+                      {isHumanizing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Humanizing...
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="mr-2 h-4 w-4" />
+                          Humanize
+                        </>
+                      )}
+                    </Button>
                     <Button
                       variant="outline"
                       onClick={handleSaveDraft}

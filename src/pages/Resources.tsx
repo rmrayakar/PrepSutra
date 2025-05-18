@@ -86,12 +86,15 @@ export default function Resources() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [description, setDescription] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileRecord | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    [key: string]: number;
+  }>({});
 
   useEffect(() => {
     if (user) {
@@ -128,41 +131,68 @@ export default function Resources() {
     },
   });
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const validFiles = files.filter((file) => {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "Error",
+          description: `File ${file.name} exceeds 10MB limit`,
+          variant: "destructive",
+        });
+        return false;
+      }
+      return true;
+    });
+    setSelectedFiles(validFiles);
+  };
+
   const uploadMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedFile) throw new Error("No file selected");
+      if (selectedFiles.length === 0) throw new Error("No files selected");
       setIsUploading(true);
 
-      const fileExt = selectedFile.name.split(".").pop();
-      const fileName = `${uuidv4()}.${fileExt}`;
-      const filePath = `${user?.id}/${fileName}`;
+      for (const file of selectedFiles) {
+        try {
+          setUploadProgress((prev) => ({ ...prev, [file.name]: 0 }));
+          const fileExt = file.name.split(".").pop();
+          const fileName = `${uuidv4()}.${fileExt}`;
+          const filePath = `${user?.id}/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("files")
-        .upload(filePath, selectedFile);
+          const { error: uploadError } = await supabase.storage
+            .from("files")
+            .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+          if (uploadError) throw uploadError;
 
-      const { error: dbError } = await supabase.from("files").insert({
-        name: selectedFile.name,
-        description,
-        file_path: filePath,
-        file_type: selectedFile.type,
-        file_size: selectedFile.size,
-        is_public: isPublic,
-        user_id: user?.id,
-      });
+          const { error: dbError } = await supabase.from("files").insert({
+            name: file.name,
+            description,
+            file_path: filePath,
+            file_type: file.type,
+            file_size: file.size,
+            is_public: isPublic,
+            user_id: user?.id,
+          });
 
-      if (dbError) throw dbError;
+          if (dbError) throw dbError;
+
+          setUploadProgress((prev) => ({ ...prev, [file.name]: 100 }));
+        } catch (error) {
+          console.error(`Error uploading ${file.name}:`, error);
+          throw error;
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["files"] });
-      setSelectedFile(null);
+      setSelectedFiles([]);
       setDescription("");
       setIsPublic(false);
+      setUploadProgress({});
       toast({
         title: "Success",
-        description: "File uploaded successfully",
+        description: "Files uploaded successfully",
       });
     },
     onError: (error) => {
@@ -267,26 +297,11 @@ export default function Resources() {
     },
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast({
-          title: "Error",
-          description: "File size exceeds 10MB limit",
-          variant: "destructive",
-        });
-        return;
-      }
-      setSelectedFile(file);
-    }
-  };
-
   const handleUpload = async () => {
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
       toast({
         title: "Error",
-        description: "Please select a file to upload",
+        description: "Please select files to upload",
         variant: "destructive",
       });
       return;
@@ -428,13 +443,36 @@ export default function Resources() {
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="file">Select File</Label>
+                    <Label htmlFor="file">Select Files</Label>
                     <Input
                       id="file"
                       type="file"
+                      multiple
                       onChange={handleFileSelect}
                       disabled={isUploading}
                     />
+                    {selectedFiles.length > 0 && (
+                      <div className="mt-2 space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          Selected files ({selectedFiles.length}):
+                        </p>
+                        <ul className="text-sm space-y-1">
+                          {selectedFiles.map((file) => (
+                            <li
+                              key={file.name}
+                              className="flex items-center justify-between"
+                            >
+                              <span className="truncate">{file.name}</span>
+                              {uploadProgress[file.name] !== undefined && (
+                                <span className="text-xs text-muted-foreground">
+                                  {uploadProgress[file.name]}%
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="description">Description</Label>
@@ -442,7 +480,7 @@ export default function Resources() {
                       id="description"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Add a description for your file"
+                      placeholder="Add a description for your files"
                       disabled={isUploading}
                     />
                   </div>
@@ -454,7 +492,7 @@ export default function Resources() {
                         onCheckedChange={setIsPublic}
                         disabled={isUploading}
                       />
-                      <Label htmlFor="public">Make this file public</Label>
+                      <Label htmlFor="public">Make these files public</Label>
                     </div>
                   )}
                 </div>
@@ -462,7 +500,7 @@ export default function Resources() {
               <CardFooter>
                 <Button
                   onClick={handleUpload}
-                  disabled={!selectedFile || isUploading}
+                  disabled={selectedFiles.length === 0 || isUploading}
                   className="w-full"
                 >
                   {isUploading ? (
@@ -473,7 +511,8 @@ export default function Resources() {
                   ) : (
                     <>
                       <Upload className="mr-2 h-4 w-4" />
-                      Upload File
+                      Upload {selectedFiles.length} File
+                      {selectedFiles.length !== 1 ? "s" : ""}
                     </>
                   )}
                 </Button>

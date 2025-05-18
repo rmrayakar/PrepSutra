@@ -744,3 +744,22 @@ export const deleteArticle = async (articleId: string) => {
     throw error;
   }
 };
+
+// Text Humanization Function
+export const humanizeText = async (text: string): Promise<string> => {
+  try {
+    const { data, error } = await supabase.functions.invoke("humanize-text", {
+      body: { text },
+    });
+
+    if (error) throw error;
+    if (!data.success) throw new Error(data.error);
+
+    // Return the humanized text from the new response format
+    return data.data.humanizedText;
+  } catch (error) {
+    console.error("Error humanizing text:", error);
+    // If there's an error, return the original text
+    return text;
+  }
+};

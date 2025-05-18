@@ -632,23 +632,23 @@ const Planner = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                <div className="w-full overflow-x-auto">
-                <div className="min-w-[320px]">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={handleDateSelect}
-                    className="rounded-md border shadow-sm pointer-events-auto"
-                    components={{
-                      DayContent: ({ date }) => (
-                        <div className="flex flex-col items-center ">
-                          <span>{date.getDate()}</span>
-                          {getTaskIndicators(date)}
-                        </div>
-                      ),
-                    }}
-                  />
-                  </div>
+                  <div className="w-full overflow-x-auto">
+                    <div className="min-w-[320px]">
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={handleDateSelect}
+                        className="rounded-md border shadow-sm pointer-events-auto"
+                        components={{
+                          DayContent: ({ date }) => (
+                            <div className="flex flex-col items-center ">
+                              <span>{date.getDate()}</span>
+                              {getTaskIndicators(date)}
+                            </div>
+                          ),
+                        }}
+                      />
+                    </div>
                   </div>
                   {selectedDateTasks.length > 0 && (
                     <div className="mt-4 space-y-2 max-h-[700px] overflow-y-auto">
@@ -683,7 +683,7 @@ const Planner = () => {
               </Card>
 
               <div className="md:col-span-8 space-y-6">
-              <Card>
+                <Card>
                   <CardHeader>
                     <CardTitle>Study Plans</CardTitle>
                     <CardDescription>Manage your study plans</CardDescription>
@@ -979,12 +979,11 @@ const Planner = () => {
                               </div>
                               <div className="flex items-center gap-2">
                                 <Button
-                                  variant="outline"
                                   onClick={() => fetchTasks(plan.id)}
                                   className={
                                     selectedPlanId === plan.id
-                                      ? "bg-primary text-primary-foreground"
-                                      : ""
+                                      ? "bg-white text-prepsutra-primary border-prepsutra-primary hover:bg-white/90"
+                                      : "bg-prepsutra-primary text-white hover:bg-prepsutra-primary/90"
                                   }
                                 >
                                   View Tasks
@@ -1009,7 +1008,7 @@ const Planner = () => {
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
-                    <div >
+                    <div>
                       <CardTitle>Task Schedule</CardTitle>
                       {/* <CardDescription>
                         {date
@@ -1112,8 +1111,10 @@ const Planner = () => {
                         <TabsTrigger value="pending">Pending</TabsTrigger>
                         <TabsTrigger value="completed">Completed</TabsTrigger>
                       </TabsList>
-                      <TabsContent value="all" className="space-y-4 max-h-[500px] overflow-y-auto">
-                        
+                      <TabsContent
+                        value="all"
+                        className="space-y-4 max-h-[500px] overflow-y-auto"
+                      >
                         {tasks.map((task) => {
                           const dueDate = formatDueDate(task.due_date);
                           return (
@@ -1194,7 +1195,10 @@ const Planner = () => {
                           );
                         })}
                       </TabsContent>
-                      <TabsContent value="pending" className="space-y-4 max-h-[500px] overflow-y-auto">
+                      <TabsContent
+                        value="pending"
+                        className="space-y-4 max-h-[500px] overflow-y-auto"
+                      >
                         {tasks
                           .filter((task) => task.status === "pending")
                           .map((task) => {
@@ -1281,7 +1285,10 @@ const Planner = () => {
                             );
                           })}
                       </TabsContent>
-                      <TabsContent value="completed" className="space-y-4 max-h-[500px] overflow-y-auto">
+                      <TabsContent
+                        value="completed"
+                        className="space-y-4 max-h-[500px] overflow-y-auto"
+                      >
                         {tasks
                           .filter((task) => task.status === "completed")
                           .map((task) => {
@@ -1370,10 +1377,7 @@ const Planner = () => {
                       </TabsContent>
                     </Tabs>
                   </CardContent>
-
                 </Card>
-
-                
               </div>
             </div>
           </div>

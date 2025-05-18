@@ -30,6 +30,13 @@ import {
   getArticleCategories,
   deleteArticle,
 } from "@/integrations/supabase/functions";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const News = () => {
   const { user } = useAuth();
@@ -41,6 +48,9 @@ const News = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [view, setView] = useState<"all" | "saved">("all");
+  const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(
+    null
+  );
 
   useEffect(() => {
     fetchCategories();
@@ -122,6 +132,51 @@ const News = () => {
       });
     }
   };
+
+  const renderArticleCard = (article: NewsArticle) => (
+    <div
+      key={article.id}
+      className="border rounded-lg p-4 space-y-2 cursor-pointer hover:bg-muted/50 transition-colors"
+      onClick={() => setSelectedArticle(article)}
+    >
+      <div className="flex justify-between items-start">
+        <h3 className="font-medium">{article.title}</h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleDeleteArticle(article.id);
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+      <p className="text-sm text-muted-foreground line-clamp-2">
+        {article.summary}
+      </p>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span>{article.source}</span>
+        <span>•</span>
+        <span>{new Date(article.published_date).toLocaleDateString()}</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="secondary">{article.category}</Badge>
+        {(Array.isArray(article.tags)
+          ? article.tags
+          : article.tags
+          ? String(article.tags)
+              .split(",")
+              .map((t) => t.trim())
+          : []
+        ).map((tag) => (
+          <Badge key={tag} variant="outline">
+            {tag}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -211,52 +266,7 @@ const News = () => {
                           No articles found.
                         </p>
                       ) : (
-                        articles.map((article) => (
-                          <div
-                            key={article.id}
-                            className="border rounded-lg p-4 space-y-2"
-                          >
-                            <div className="flex justify-between items-start">
-                              <h3 className="font-medium">{article.title}</h3>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteArticle(article.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {article.summary}
-                            </p>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <span>{article.source}</span>
-                              <span>•</span>
-                              <span>
-                                {new Date(
-                                  article.published_date
-                                ).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Badge variant="secondary">
-                                {article.category}
-                              </Badge>
-                              {(Array.isArray(article.tags)
-                                ? article.tags
-                                : article.tags
-                                ? String(article.tags)
-                                    .split(",")
-                                    .map((t) => t.trim())
-                                : []
-                              ).map((tag) => (
-                                <Badge key={tag} variant="outline">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        ))
+                        articles.map(renderArticleCard)
                       )}
                     </TabsContent>
                     <TabsContent value="saved" className="space-y-4">
@@ -271,52 +281,7 @@ const News = () => {
                           No saved articles found.
                         </p>
                       ) : (
-                        articles.map((article) => (
-                          <div
-                            key={article.id}
-                            className="border rounded-lg p-4 space-y-2"
-                          >
-                            <div className="flex justify-between items-start">
-                              <h3 className="font-medium">{article.title}</h3>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteArticle(article.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {article.summary}
-                            </p>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <span>{article.source}</span>
-                              <span>•</span>
-                              <span>
-                                {new Date(
-                                  article.published_date
-                                ).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Badge variant="secondary">
-                                {article.category}
-                              </Badge>
-                              {(Array.isArray(article.tags)
-                                ? article.tags
-                                : article.tags
-                                ? String(article.tags)
-                                    .split(",")
-                                    .map((t) => t.trim())
-                                : []
-                              ).map((tag) => (
-                                <Badge key={tag} variant="outline">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        ))
+                        articles.map(renderArticleCard)
                       )}
                     </TabsContent>
                   </Tabs>
@@ -324,6 +289,77 @@ const News = () => {
               </Card>
             </div>
           </div>
+
+          {/* Article View Dialog */}
+          <Dialog
+            open={!!selectedArticle}
+            onOpenChange={() => setSelectedArticle(null)}
+          >
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+              {selectedArticle && (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>{selectedArticle.title}</DialogTitle>
+                    <DialogDescription>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                        {selectedArticle.author && (
+                          <span>By {selectedArticle.author}</span>
+                        )}
+                        <span>•</span>
+                        <span>{selectedArticle.source}</span>
+                        <span>•</span>
+                        <span>
+                          {new Date(
+                            selectedArticle.published_date
+                          ).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">
+                        {selectedArticle.category}
+                      </Badge>
+                      {(Array.isArray(selectedArticle.tags)
+                        ? selectedArticle.tags
+                        : selectedArticle.tags
+                        ? String(selectedArticle.tags)
+                            .split(",")
+                            .map((t) => t.trim())
+                        : []
+                      ).map((tag) => (
+                        <Badge key={tag} variant="outline">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="prose prose-sm max-w-none">
+                      {selectedArticle.content
+                        .split("\n")
+                        .map((paragraph, index) => (
+                          <p key={index} className="mb-4">
+                            {paragraph}
+                          </p>
+                        ))}
+                    </div>
+                    {selectedArticle.url && (
+                      <div className="text-sm text-muted-foreground">
+                        <a
+                          href={selectedArticle.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:underline"
+                        >
+                          Read original article
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </div>
