@@ -8,10 +8,29 @@ import {
 } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { X } from "lucide-react";
 
 const DashboardOverview = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const handlePerformanceTrackerClick = () => {
+    toast.info("Performance Tracker is coming soon!", {
+      action: {
+        label: (
+          <button
+            className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 border border-gray-200 p-0 m-0"
+            style={{ lineHeight: 0 }}
+            tabIndex={0}
+            aria-label="Dismiss"
+          >
+            <X className="w-3.5 h-3.5 text-gray-500" />
+          </button>
+        ),
+        onClick: (t) => toast.dismiss(t),
+      },
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -110,7 +129,7 @@ const DashboardOverview = () => {
         </Card>
 
         <Card
-          onClick={() => navigate("/tracker")}
+          onClick={handlePerformanceTrackerClick}
           className="cursor-pointer group hover:border-prepsutra-primary/50 hover:z-10"
         >
           <CardHeader className="pb-2">

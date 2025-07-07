@@ -834,3 +834,17 @@ export const countUnreadHelpMessages = async () => {
   if (error) throw error;
   return count || 0;
 };
+
+export const deleteHelpMessage = async (id: string) => {
+  try {
+    const { error } = await supabase
+      .from("help_messages")
+      .delete()
+      .eq("id", id);
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error("Error deleting help message:", error);
+    throw error;
+  }
+};

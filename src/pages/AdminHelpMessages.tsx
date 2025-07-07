@@ -4,6 +4,7 @@ import {
   updateHelpMessage,
   markHelpMessageRead,
   countUnreadHelpMessages,
+  deleteHelpMessage,
 } from "@/integrations/supabase/functions";
 import {
   Table,
@@ -33,6 +34,7 @@ import {
   XCircle,
   RefreshCw,
   Search,
+  Trash2,
 } from "lucide-react";
 import React from "react";
 import Header from "@/components/layout/Header";
@@ -244,6 +246,31 @@ export default function AdminHelpMessages() {
                                 onClick={() => handleOpen(msg)}
                               >
                                 View
+                              </Button>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    await deleteHelpMessage(msg.id);
+                                    toast({ title: "Message deleted" });
+                                    fetchAll();
+                                  } catch (error: any) {
+                                    toast({
+                                      title: "Error",
+                                      description:
+                                        error.message ||
+                                        "Failed to delete message.",
+                                      variant: "destructive",
+                                    });
+                                  }
+                                }}
+                                aria-label="Delete message"
+                              >
+                                <Trash2 className="w-4 h-4" />
                               </Button>
                             </TableCell>
                           </TableRow>
