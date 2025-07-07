@@ -209,4 +209,67 @@ USING (
 );
 
 -- Enable RLS on storage.objects
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY; 
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- Create help_messages table to store user help/contact requests
+CREATE TABLE IF NOT EXISTS public.help_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id),
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open', -- open, closed, in_progress
+    read boolean NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Add indexes for help_messages
+CREATE INDEX IF NOT EXISTS help_messages_user_id_idx ON public.help_messages (user_id);
+CREATE INDEX IF NOT EXISTS help_messages_status_idx ON public.help_messages (status);
+
+-- Enable Row Level Security
+ALTER TABLE public.help_messages ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can insert their own help messages
+CREATE POLICY "Users can insert their own help messages"
+ON public.help_messages FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = user_id);
+
+-- Policy: Users can view their own help messages
+CREATE POLICY "Users can view their own help messages"
+ON public.help_messages FOR SELECT
+TO authenticated
+USING (auth.uid() = user_id);
+
+-- Policy: Admin can view all help messages
+CREATE POLICY "Admin can view all help messages"
+ON public.help_messages FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE profiles.id = auth.uid()
+    AND profiles.username = 'rmrayakar2004'
+  )
+);
+
+-- Policy: Admin can update help message status
+CREATE POLICY "Admin can update help message status"
+ON public.help_messages FOR UPDATE
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE profiles.id = auth.uid()
+    AND profiles.username = 'rmrayakar2004'
+  )
+);
+
+-- Trigger to update the updated_at column for help_messages
+CREATE TRIGGER update_help_messages_timestamp
+BEFORE UPDATE ON public.help_messages
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column(); 

@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import Resources from "./pages/Resources";
 import UploadQuestions from "./pages/UploadQuestions";
+import AdminHelpMessages from "./pages/AdminHelpMessages";
 
 const queryClient = new QueryClient();
 
@@ -88,6 +89,14 @@ const App = () => (
               element={
                 <AuthGuard>
                   <Resources />
+                </AuthGuard>
+              }
+            />
+            <Route
+              path="/admin/help-messages"
+              element={
+                <AuthGuard>
+                  <AdminHelpMessages />
                 </AuthGuard>
               }
             />

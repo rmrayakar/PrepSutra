@@ -23,6 +23,7 @@ import {
   CommandShortcut,
 } from "@/components/ui/command";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
 // Navigation items that will appear in search
 const navigationItems = [
@@ -112,6 +113,17 @@ const Header = () => {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      // Check admin status by username
+      setIsAdmin(user.email && user.email.startsWith("rmrayakar2004"));
+    } else {
+      setIsAdmin(false);
+    }
+  }, [user]);
 
   // Handle keyboard shortcut
   useEffect(() => {
@@ -193,6 +205,14 @@ const Header = () => {
           </div>
 
           <div className="flex items-center gap-4">
+            {isAdmin && (
+              <Link
+                to="/admin/help-messages"
+                className="text-sm font-medium transition-all duration-200 hover:text-prepsutra-primary relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 after:bg-prepsutra-primary after:transition-all after:duration-200 hover:after:w-full"
+              >
+                Admin Help
+              </Link>
+            )}
             <Button
               variant="ghost"
               size="icon"

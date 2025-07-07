@@ -445,6 +445,52 @@ export interface Database {
           }
         ];
       };
+      help_messages: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          email: string;
+          subject: string;
+          message: string;
+          status: string;
+          read: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          email: string;
+          subject: string;
+          message: string;
+          status?: string;
+          read?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          email?: string;
+          subject?: string;
+          message?: string;
+          status?: string;
+          read?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "help_messages_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;

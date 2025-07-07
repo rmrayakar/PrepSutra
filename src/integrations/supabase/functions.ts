@@ -763,3 +763,74 @@ export const humanizeText = async (text: string): Promise<string> => {
     return text;
   }
 };
+
+// Help Message Functions
+export const sendHelpMessage = async (
+  name: string,
+  email: string,
+  subject: string,
+  message: string
+) => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    throw new Error("User must be authenticated to send help messages");
+  const { data, error } = await supabase
+    .from("help_messages")
+    .insert({
+      user_id: user.id,
+      name,
+      email,
+      subject,
+      message,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
+export const fetchHelpMessages = async () => {
+  // Only admin can fetch all help messages (enforced by RLS)
+  const { data, error } = await supabase
+    .from("help_messages")
+    .select("*, profiles: user_id (full_name, email)")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+};
+
+export const updateHelpMessage = async (
+  id: string,
+  updates: { status?: string }
+) => {
+  const { data, error } = await supabase
+    .from("help_messages")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
+export const markHelpMessageRead = async (id: string) => {
+  const { data, error } = await supabase
+    .from("help_messages")
+    .update({ read: true })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
+export const countUnreadHelpMessages = async () => {
+  const { count, error } = await supabase
+    .from("help_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("read", false);
+  if (error) throw error;
+  return count || 0;
+};
