@@ -1,153 +1,114 @@
-# PrepSutra
+<h1 style="display: flex; align-items: center;">
+  <img src="./public/icon.png" alt="PrepSutra Logo" width="30" style="margin-right: 10px;">
+  PrepSutra – AI Platform for UPSC Mastery
+</h1>
 
-AI Platform for UPSC Mastery
 
-PrepSutra is a comprehensive UPSC preparation platform that leverages artificial intelligence to provide personalized study assistance, resource management, and learning tools.
+> **Your AI-powered UPSC preparation companion** – Plan efficiently, stay informed, master PYQs, craft impactful essays, and organize resources — all in one platform.
 
-## Features
 
-### 1. Study Planner
+---
 
-- Create personalized study plans
-- Track study progress
-- View and manage study schedules
-- Set goals and milestones
-- Monitor study plan completion
+## 🏷️ Badges
+<p align="center">
+  <img src="https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB"/>
+  <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Node.js-339933?logo=node.js&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Express.js-000000?logo=express&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white"/>
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Supabase-3ECF8E?logo=supabase&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white"/>
+</p>
 
-### 2. News Summarizer
+---
 
-- Access latest UPSC-relevant news
-- Get AI-powered news summaries
-- Save important articles
-- Categorize news by topics
-- Track reading history
+## 📑 Table of Contents
+- [✨ Features](#-features)
+- [🛠 Technical Overview](#-technical-overview)
+- [🚀 Getting Started](#-getting-started)
 
-### 3. PYQ Analyzer
+---
 
-- Analyze previous year questions
-- Get detailed explanations
-- Access question bank
-- Track question-solving progress
-- Get performance analytics
+## ✨ Features
 
-### 4. Essay Builder
+### 📅 Study Planner
+- AI-personalized study schedules  
+- Track progress, milestones, and completion  
 
-- Create and edit essays
-- Get AI-powered feedback
-- Save essay drafts
-- Access essay templates
-- Humanize AI-generated content
-- Word count tracking
+### 📰 News Summarizer
+- AI-generated UPSC-relevant news summaries  
+- Categorize, save, and review articles  
 
-### 5. Resource Management
+### 📊 PYQ Analyzer
+- Detailed **Previous Year Question** analysis  
+- Track performance and view analytics  
 
-- Upload study materials
-- Organize files by categories
-- Share resources with others
-- Access public resources
-- File preview functionality
-- Multiple file upload support
+### ✍️ Essay Builder
+- Draft essays with **AI feedback**  
+- Templates, word count tracking, and humanization  
 
-### 6. User Profile
+### 📂 Resource Management
+- Upload, organize, and preview study materials  
+- Share and access public resources  
 
-- Personal information management
-- Profile customization
-- Avatar upload and management
-- Track study progress
-- View stored files count
-- Password management
-- Account deletion option
+### 👤 User Profile
+- Customize profile & avatar  
+- Track study journey and stored files  
 
-### 7. Authentication
+---
 
-- Secure user authentication
-- Email-based signup/login
-- Password reset functionality
-- Session management
-- Protected routes
+## 🛠 Technical Overview
 
-### 8. Dashboard
+**Frontend**  
+- ![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB) — Multi-page React application with dynamic components and smooth navigation  
+- ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white) — Utility-first CSS framework for responsive and visually consistent UI design  
 
-- Overview of all activities
-- Quick access to main features
-- Progress tracking
-- Recent activity display
-- Personalized welcome message
+**Backend**  
+- ![Node.js](https://img.shields.io/badge/Node.js-339933?logo=node.js&logoColor=white) — JavaScript runtime powering scalable and high-performance backend services  
+- ![Express.js](https://img.shields.io/badge/Express.js-000000?logo=express&logoColor=white) — Lightweight web framework for building RESTful APIs and handling routing  
+- ![Next.js](https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white) — React framework offering server-side rendering and integrated API routes  
 
-### 9. Contact Support
+**Database**  
+- ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white) — Reliable relational database supporting complex queries and data integrity  
+- ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?logo=supabase&logoColor=white) — Backend-as-a-service with real-time database, authentication, and storage  
 
-- Direct contact form
-- Email support
-- Phone support
-- Technical issue reporting
-- Feedback submission
+**Deployment**  
+- ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white) — Cloud hosting platform enabling instant deployment, preview URLs, and CI/CD pipelines  
 
-## Technical Features
+---
 
-### Frontend
+## 🚀 Getting Started
 
-- React-based SPA
-- Responsive design
-- Modern UI components
-- Real-time updates
-- Smooth transitions
-- Toast notifications
+**Requirements**
+- Node.js v18+
+- npm v9+
+- Internet connection
 
-### Backend
+### 1️⃣ Clone the repo
+```bash
+git clone https://github.com/rmrayakar/PrepSutra.git
+cd PrepSutra
+```
+### 2️⃣ Install dependencies
+```bash
+npm install
+```
+### 3️⃣ Configure environment variables
+```bash
+cp .env.example .env
+```
+### 4️⃣ Start the dev server
+```bash
+npm run dev
+```
 
-- Supabase integration
-- Real-time database
-- File storage
-- User authentication
-- Row-level security
-- API endpoints
+---
 
-### Security
+<p align="center">
+  ⭐ If you found PrepSutra useful, consider giving it a star on <a href="https://github.com/yourusername/PrepSutra">GitHub</a>!  
+</p>
 
-- Protected routes
-- Secure file handling
-- User data encryption
-- Role-based access control
-- Input validation
-
-## Getting Started
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Set up environment variables:
-   ```bash
-   cp .env.example .env
-   ```
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-## Environment Variables
-
-Required environment variables:
-
-- `VITE_SUPABASE_URL`: Supabase project URL
-- `VITE_SUPABASE_ANON_KEY`: Supabase anonymous key
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For support, please contact:
-
-- Email: support@prepsutra.com
-- Phone: +91 99649 75545
+<p align="center">
+  Made with ❤️ in India for UPSC Aspirants  
+</p>
